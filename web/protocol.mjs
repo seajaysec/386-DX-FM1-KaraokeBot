@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 // The FM-1's 386DX protocol over Web MIDI (firmware/src/app/companion.h): F0 7D 4F 4D cmd data.. F7,
 // a reply to each request. Numbers are little-endian base 128; bytes travel as two 7-bit halves.
-import {portNames, isUsual} from './ports.mjs?v=1.0.5';
+import {portNames, isUsual} from './ports.mjs?v=1.0.6';
 export const HEADER = [0xf0, 0x7d, 0x4f, 0x4d];
 export const PROTOCOL = 8;
 export const le7 = (n, k = 2) => Array.from({length: k}, (_, i) => Math.floor(n / 2 ** (7 * i)) & 127);

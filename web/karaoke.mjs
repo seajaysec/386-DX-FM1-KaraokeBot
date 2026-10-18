@@ -53,8 +53,10 @@ const ascii=s=>s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[‘�
 const isCredit=text=>text.replace(/^[\s/\\]+/,'').startsWith('@')||/^(?:[\s/\\]*(?:international rights|all rights reserved|do not duplicate|not for (?:rental|broadcast)|or transmission|gm device|(?:sequenced|arranged|composed|written|performed|produced|transcribed|programmed|lyrics|music)\s+by|(?:sequence|arrangement|composer|author|artist|attribution|credits?|keyboards?|drums(?:\s*&\s*backup)?|backup|bass|piano)\s*:|copyright|\(c\)|©))/i.test(text);
 export function lyricLines(stream){
  const raw=[];let cur={text:'',chunks:[]};const finish=()=>{cur.text=cur.text.trim();if(cur.chunks.length){cur.chunks[0].text=cur.chunks[0].text.trimStart();cur.chunks.at(-1).text=cur.chunks.at(-1).text.trimEnd();}if(/[A-Za-z0-9]/.test(cur.text)&&cur.chunks.length)raw.push(cur);cur={text:'',chunks:[]};};
+ let wrapped=false;   // a line ended in the middle of a word's text: a capital next means a new line began
  for(const e of stream.events){if(isCredit(e.text))continue;const parts=ascii(e.text).replace(/\\r/g,'\r').replace(/\\n/g,'\n').split(/([\r\n/\\])/);
-  for(const part of parts){if(!part)continue;if(/^[\r\n/\\]$/.test(part)){if(part==='/'||part==='\\'||!cur.text||/\s$/.test(cur.text))finish();continue;}if(/[^\x20-\x7e]/.test(part))throw Error('Lyrics contain unsupported characters. Edit a copy into English ASCII before importing.');if(part.trim()){cur.chunks.push({tick:e.tick,text:part});cur.text+=part;}else {cur.text+=part;if(cur.chunks.length)cur.chunks.at(-1).text+=part;}}
+  for(const part of parts){if(!part)continue;if(/^[\r\n/\\]$/.test(part)){if(part==='/'||part==='\\'||!cur.text||/\s$/.test(cur.text))finish();else wrapped=true;continue;}
+   if(wrapped&&part.trim()){if(/^\s*[A-Z]/.test(part))finish();wrapped=false;}if(/[^\x20-\x7e]/.test(part))throw Error('Lyrics contain unsupported characters. Edit a copy into English ASCII before importing.');if(part.trim()){cur.chunks.push({tick:e.tick,text:part});cur.text+=part;}else {cur.text+=part;if(cur.chunks.length)cur.chunks.at(-1).text+=part;}}
  }finish();
  // Long karaoke rows split at complete-word boundaries, preserving each
  // original chunk's tick. Never split a word merely because its display wrapped.
