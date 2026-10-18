@@ -1,7 +1,7 @@
 # 386DX for the M-VAVE FM-1
 
 This project is inspired by and an homage to Alexei Shulgin, an artist in Russia who performed
-briefly as 386 DX, which he billed as “the world’s first cyberpunk band.” At shows, Alexei was
+briefly as 386 DX, which he billed as “[the world’s first cyberpunk band](https://youtu.be/iZNdhuB3Lqo).” At shows, Alexei was
 introduced by a computerized voice announcing that the human onstage was merely a decoration.
 He’d then “perform” onstage, air-strumming a computer keyboard like an electric guitar as
 text-to-speech singing voices played along to MIDI covers of pop songs.
