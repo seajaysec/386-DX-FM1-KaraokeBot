@@ -40,7 +40,7 @@ function watchPorts() {
   watchTimer = setTimeout(async () => {
     if (device?.gone) lost();
     if (device || !wanted || busy) return;
-    const back = await Device.find(access);  // quietly: only an FM-1 that answers as 386DX
+    const back = await findOurs(access);     // quietly: only an FM-1 that answers as 386DX
     if (back && !device && !busy) { back.close(); guard(connect, 'device')(); }
   }, 800);
 }
@@ -53,33 +53,36 @@ function guard(fn, where) {
 }
 
 // ---- the FM-1 ----
-async function connect() {
-  wanted = true;
-  disconnected('Connecting…');               // the slots show only for an FM-1 running 386DX
-  const access = await midiAccess();
-  device = await Device.find(access);
-  let s = device && await device.status();
-  if (!device) {
-    // no 386DX: an FM-1 with other firmware, or one under a name the page doesn't know
-    const found = await new Updater(access).scan();
-    if (found.some(d => IS_OTA(d.id))) return offer('This FM-1 is waiting in update mode.', 'finish');
-    const other = found.find(d => d.id.model === 'FM-1');
-    if (other && fw && other.id.text === fw.product) return offer('Connected: this FM-1 runs an older 386DX.', 'update');
-    if (other) return offer(`Connected: this FM-1 runs ${other.id.text}, not 386DX.`, 'install');
-    const name = await pickPort(access, 'No FM-1 answered under its usual name. Which of these is it?');
-    if (!name) { say('device', 'Not connected.'); return offer('', 'install'); }
-    device = Device.open(access, name);
-    try { s = await device.status(); } catch (e) {
-      device?.close(); device = null;
-      if (e.older) { remember(name); return offer(e.message, 'update'); }
-      const up = new Updater(access); up.allow(name);
-      const id = (await up.probe(name))?.id;
-      if (!id) throw e;
-      remember(name);
-      return offer(`Connected: this FM-1 runs ${id.text}, not 386DX.`, 'install');
+// First what every FM-1 answers, the identity query, as the other installers do; only a port that says it
+// runs 386DX (FM-1_386...) is then spoken to in 386DX's own messages. Nothing else is sent to other firmware.
+const OURS = /^FM-1_386/;
+function updater(access) {
+  const up = new Updater(access);
+  up.setPatterns([...PRESET_PORTS, ...rememberedNames()]);
+  return up;
+}
+// an FM-1 right after an install or a restart takes a few seconds to answer in 386DX's messages
+async function statusOf(dev) {
+  for (let tries = 0; ; tries++) {
+    try { return await dev.status(); } catch (e) {
+      if (!e.lost || tries >= 4) throw e;
+      await new Promise(r => setTimeout(r, 1500));
     }
-    remember(name);
   }
+}
+// d: {name, id}, a port that answered the identity query
+async function adopt(access, d) {
+  if (IS_OTA(d.id)) return offer('This FM-1 is waiting in update mode.', 'finish');
+  if (!OURS.test(d.id.text)) return offer(`Connected: this FM-1 runs ${d.id.text}, not 386DX.`, 'install');
+  device = Device.open(access, d.name);
+  if (!device) throw Error('The FM-1 went away. Plug it in again.');
+  let s;
+  try { s = await statusOf(device); } catch (e) {
+    device.close(); device = null;
+    if (e.older) return offer(e.message, 'update');
+    throw e;
+  }
+  remember(d.name);
   device.onLost = lost;
   const build = s.build || 'an older build';
   showChanges(s.build || '');
@@ -87,6 +90,33 @@ async function connect() {
   offer('', !fw ? 'install' : s.build === fw.version ? 'current' : 'update');
   await listSlots();
   $('songs').hidden = false;
+}
+// quietly: an FM-1 that answers as 386DX, opened
+async function findOurs(access) {
+  for (const d of await updater(access).scan()) {
+    if (!OURS.test(d.id.text)) continue;
+    const dev = Device.open(access, d.name);
+    if (!dev) continue;
+    try { await dev.status(); return dev; } catch { dev.close(); }
+  }
+  return null;
+}
+async function connect() {
+  wanted = true;
+  disconnected('Connecting…');               // the slots show only for an FM-1 running 386DX
+  const access = await midiAccess();
+  const found = await updater(access).scan();
+  const d = found.find(x => IS_OTA(x.id)) || found.find(x => OURS.test(x.id.text)) || found.find(x => x.id.model === 'FM-1') || found[0];
+  if (d) return adopt(access, d);
+  // none under a usual name: the list of every MIDI port, and the one picked is asked the same question
+  const name = await pickPort(access, 'No FM-1 answered under its usual name. Which of these is it?');
+  if (!name) { say('device', 'Not connected.'); return offer('', 'install'); }
+  const up = updater(access);
+  up.allow(name);
+  const picked = await up.probe(name);
+  if (!picked) throw Error(`“${name}” did not answer as an FM-1. Check the cable and close other apps that use MIDI.`);
+  remember(name);
+  return adopt(access, picked);
 }
 
 // the one install button says what it would do for the FM-1 connected
