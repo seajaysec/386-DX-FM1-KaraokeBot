@@ -1,18 +1,19 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 // The companion page: bring a karaoke song in, keep songs on the FM-1, install the firmware.
-import {readMidi} from './karaoke.mjs?v=1.0.2';
-import {planKaraoke} from './onboarding.mjs?v=1.0.2';
-import {songFromModel, songBytes7, decodeSong7} from './song7.mjs?v=1.0.2';
-import {Device} from './protocol.mjs?v=1.0.2';
-import {Engine} from './singing.mjs?v=1.0.2';
-import {Updater, IS_OTA, PRESET_PORTS, setTrace} from './firmware-update.mjs?v=1.0.2';
-import {pickPort, remember, rememberedNames, portNames} from './ports.mjs?v=1.0.2';
-import {productOf, logicalImage} from './firmware-package.mjs?v=1.0.2';
+import {readMidi} from './karaoke.mjs?v=1.0.3';
+import {planKaraoke} from './onboarding.mjs?v=1.0.3';
+import {songFromModel, songBytes7, decodeSong7} from './song7.mjs?v=1.0.3';
+import {Device} from './protocol.mjs?v=1.0.3';
+import {Engine} from './singing.mjs?v=1.0.3';
+import {Updater, IS_OTA, PRESET_PORTS, setTrace} from './firmware-update.mjs?v=1.0.3';
+import {pickPort, remember, rememberedNames, portNames} from './ports.mjs?v=1.0.3';
+import {productOf, logicalImage} from './firmware-package.mjs?v=1.0.3';
 
 const $ = id => document.getElementById(id);
 const say = (id, text) => { $(id).textContent = text; };
 const engine = new Engine();
 let access = null, device = null, fw = null, busy = false;
+let blind = null;                     // a port picked that never answered: Install asks it to update anyway
 
 async function midiAccess() {
   if (!navigator.requestMIDIAccess) throw Error('This browser has no Web MIDI. Use Chrome or Edge.');
@@ -146,7 +147,13 @@ async function connect() {
   const up = updater(access);
   up.allow(name);
   const picked = await up.probe(name);
-  if (!picked) throw Error(`“${name}” did not answer as an FM-1. Check the cable and close other apps that use MIDI.`);
+  if (!picked) {
+    // no answer to the question every FM-1 firmware we know answers; Install can still ask it to update
+    blind = name;
+    remember(name);
+    showReport('connect', Error(`“${name}” did not answer as an FM-1.`));
+    return offer(`“${name}” did not answer as an FM-1. If it is your FM-1, press Install: it asks it to update anyway.`, 'install');
+  }
   remember(name);
   return adopt(access, picked);
 }
@@ -327,15 +334,16 @@ async function install() {
   updater.setPatterns([...PRESET_PORTS, ...rememberedNames()]);
   say('install-status', 'Looking for the FM-1…');
   let dev = (await updater.scan())[0];
+  let unanswered = null;
   if (!dev) {
-    const name = await pickPort(access, 'No FM-1 answered under its usual name. Which of these is it?');
+    const name = blind || await pickPort(access, 'No FM-1 answered under its usual name. Which of these is it?');
     if (!name) { say('install-status', `Ready: 386DX ${fw.version}.`); return; }
     updater.allow(name);
     dev = await updater.probe(name);
-    if (!dev) throw Error(`“${name}” did not answer as an FM-1. Check the cable and close other apps that use MIDI.`);
+    if (!dev) unanswered = name;       // it said nothing: ask it to update anyway (the user picked it)
     remember(name);
   }
-  updater.select(dev.name);
+  updater.select(dev ? dev.name : unanswered);
   const bar = $('install-progress'); bar.hidden = false; bar.value = 0;
   const total = Math.max(1, Math.round(fw.image.length / 512));
   const step = (phase, n) => {
@@ -345,11 +353,15 @@ async function install() {
     if (phase === 'reboot') say('install-status', 'Restarting…');
   };
   try {
-    if (IS_OTA(dev.id)) {
+    if (unanswered) {
+      say('install-status', 'It did not answer the usual question. Asking it to update anyway…');
+      await updater.installBlind(unanswered, fw.image, fw.product, step);
+    } else if (IS_OTA(dev.id)) {
       say('install-status', 'Finishing an update that was cut off…');
       if (!await updater.resume(fw.image, step, fw.product)) throw Object.assign(Error(), {code: 'stopped'});
     } else await updater.install(fw.image, fw.product, step);
     bar.value = 1;
+    blind = null;
     say('install-status', `Installed 386DX ${fw.version}.`);
     setTimeout(() => guard(connect, 'device')(), 2500);   // read the build back from the FM-1
   } catch (e) {
