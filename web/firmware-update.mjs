@@ -152,15 +152,21 @@ export class Updater {
   select(name) { this.target = name; if (name) this.allow(name); }
 
   // every MIDI port that has both an input and an output of the same name
+  // (or, with a single output in all, every input: Windows can name the two halves differently)
   ports() {
-    const outs = new Set([...this.access.outputs.values()].filter((o) => o.state !== "disconnected").map((o) => o.name));
-    return this.inputNames().filter((n) => outs.has(n));
+    const live = [...this.access.outputs.values()].filter((o) => o.state !== "disconnected");
+    const outs = new Set(live.map((o) => o.name));
+    return this.inputNames().filter((n) => outs.has(n) || live.length === 1);
+  }
+  output(name) {
+    const live = [...this.access.outputs.values()].filter((o) => o.state !== "disconnected");
+    return live.find((o) => o.name === name) || (live.length === 1 ? live[0] : null);
   }
 
   // ask one port who it is (the FM-1's identity query; harmless to other gear but sent only on request)
   async probe(name) {
     const input = [...this.access.inputs.values()].find((i) => i.name === name && i.state !== "disconnected");
-    const output = [...this.access.outputs.values()].find((o) => o.name === name && o.state !== "disconnected");
+    const output = this.output(name);
     if (!input || !output) return null;
     try { await input.open(); await output.open(); } catch (_) { return null; }
     const link = new Link(input, output);
@@ -195,7 +201,7 @@ export class Updater {
       const fresh = this.baseline && !this.baseline.has(input.name || "");
       if (!known && !fresh) continue;   // never probe other gear
       if (!this.baseline && this.target && input.name !== this.target) continue;
-      const output = outs.find((o) => o.name === input.name && o.state !== "disconnected");
+      const output = this.output(input.name);
       if (!output) continue;
       try { await input.open(); await output.open(); } catch (_) { continue; }
       const link = new Link(input, output);

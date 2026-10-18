@@ -19,7 +19,7 @@ export const isUsual = name => USUAL.test(name || '') || rememberedNames().inclu
 export function portNames(access) {
   const live = m => [...m.values()].filter(p => p.state !== 'disconnected').map(p => p.name || '');
   const outs = new Set(live(access.outputs));
-  return [...new Set(live(access.inputs))].filter(n => outs.has(n));
+  return [...new Set(live(access.inputs))].filter(n => outs.has(n) || outs.size === 1);   // one output: Windows may name it apart
 }
 
 // the list, in the page's <dialog id="ports-dialog">; resolves to the name picked, or null

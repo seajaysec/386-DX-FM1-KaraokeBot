@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 // The FM-1's 386DX protocol over Web MIDI (firmware/src/app/companion.h): F0 7D 4F 4D cmd data.. F7,
 // a reply to each request. Numbers are little-endian base 128; bytes travel as two 7-bit halves.
-import {portNames, isUsual} from './ports.mjs';
+import {portNames, isUsual} from './ports.mjs?v=1.0.2';
 export const HEADER = [0xf0, 0x7d, 0x4f, 0x4d];
 export const PROTOCOL = 7;
 export const le7 = (n, k = 2) => Array.from({length: k}, (_, i) => Math.floor(n / 2 ** (7 * i)) & 127);
@@ -17,7 +17,8 @@ export class Device {
   // the port named `name`, or null when it is gone
   static open(access, name) {
     const live = p => p.name === name && p.state !== 'disconnected';
-    const input = [...access.inputs.values()].find(live), output = [...access.outputs.values()].find(live);
+    const outs = [...access.outputs.values()].filter(p => p.state !== 'disconnected');
+    const input = [...access.inputs.values()].find(live), output = outs.find(live) || (outs.length === 1 ? outs[0] : null);
     return input && output ? new Device(input, output) : null;
   }
   // the first port with a usual or remembered name that answers as 386DX
