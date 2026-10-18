@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 // The companion page: bring a karaoke song in, keep songs on the FM-1, install the firmware.
-import {readMidi} from './karaoke.mjs';
-import {planKaraoke} from './onboarding.mjs';
-import {songFromModel, songBytes7, decodeSong7} from './song7.mjs';
-import {Device} from './protocol.mjs';
-import {Engine} from './singing.mjs';
-import {Updater, IS_OTA, PRESET_PORTS} from './firmware-update.mjs';
-import {pickPort, remember, rememberedNames} from './ports.mjs';
-import {productOf, logicalImage} from './firmware-package.mjs';
+import {readMidi} from './karaoke.mjs?v=1.0.1';
+import {planKaraoke} from './onboarding.mjs?v=1.0.1';
+import {songFromModel, songBytes7, decodeSong7} from './song7.mjs?v=1.0.1';
+import {Device} from './protocol.mjs?v=1.0.1';
+import {Engine} from './singing.mjs?v=1.0.1';
+import {Updater, IS_OTA, PRESET_PORTS, setTrace} from './firmware-update.mjs?v=1.0.1';
+import {pickPort, remember, rememberedNames, portNames} from './ports.mjs?v=1.0.1';
+import {productOf, logicalImage} from './firmware-package.mjs?v=1.0.1';
 
 const $ = id => document.getElementById(id);
 const say = (id, text) => { $(id).textContent = text; };
@@ -44,11 +44,41 @@ function watchPorts() {
     if (back && !device && !busy) { back.close(); guard(connect, 'device')(); }
   }, 800);
 }
+// ---- the report: what the page did and saw, shown only after something went wrong ----
+const trail = [];
+const note = (text) => { trail.push(`${((performance.now() - t0) / 1000).toFixed(1).padStart(6)} s  ${text}`); if (trail.length > 300) trail.shift(); };
+const t0 = performance.now();
+setTrace(note);
+function ports() {
+  if (!access) return ['(no MIDI access yet)'];
+  const line = (kind, p) => `${kind} “${p.name}” by “${p.manufacturer || ''}” id ${p.id} ${p.state}/${p.connection}${p.version ? ' v' + p.version : ''}`;
+  return [...[...access.inputs.values()].map(p => line('in ', p)), ...[...access.outputs.values()].map(p => line('out', p))];
+}
+function showReport(where, e) {
+  note(`ERROR in ${where}: ${e.message}${e.code ? ` (code ${e.code})` : ''}${e.stack ? '\n' + e.stack.split('\n').slice(0, 3).join('\n') : ''}`);
+  const lines = [
+    `386DX page report, ${new Date().toISOString()}`,
+    `page: ${location.origin}${location.pathname}, firmware on this page ${fw?.version ?? '?'} (${fw?.product ?? '?'})`,
+    `browser: ${navigator.userAgent}`,
+    `platform: ${navigator.userAgentData?.platform ?? navigator.platform}`,
+    `error: ${e.message}`,
+    `MIDI ports the browser sees:`, ...ports().map(l => '  ' + l),
+    `remembered port names: ${JSON.stringify(rememberedNames())}`,
+    `what the page did:`, ...trail.map(l => '  ' + l),
+  ];
+  $('report-text').value = lines.join('\n');
+  $('report').hidden = false;
+}
+$('report-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('report-text').value); say('report-status', 'Copied.'); }
+  catch { $('report-text').select(); say('report-status', 'Select all and copy it by hand.'); }
+});
 function guard(fn, where) {
   return async (...a) => {
     if (busy) return;
     busy = true;
-    try { await fn(...a); } catch (e) { say(where, e.message); } finally { busy = false; }
+    note(`start ${fn.name}`);
+    try { await fn(...a); note(`done ${fn.name}`); } catch (e) { say(where, e.message); showReport(fn.name, e); } finally { busy = false; }
   };
 }
 
@@ -105,7 +135,9 @@ async function connect() {
   wanted = true;
   disconnected('Connecting…');               // the slots show only for an FM-1 running 386DX
   const access = await midiAccess();
+  note('MIDI ports: ' + portNames(access).join(' | '));
   const found = await updater(access).scan();
+  note('answered the identity query: ' + (found.map(x => `${x.name} = ${x.id.text}`).join('; ') || 'nothing'));
   const d = found.find(x => IS_OTA(x.id)) || found.find(x => OURS.test(x.id.text)) || found.find(x => x.id.model === 'FM-1') || found[0];
   if (d) return adopt(access, d);
   // none under a usual name: the list of every MIDI port, and the one picked is asked the same question

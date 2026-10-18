@@ -35,6 +35,14 @@
   <div id="changes"></div>
 </section>
 
+<section aria-labelledby="h-report" id="report" hidden>
+  <h2 id="h-report">Something went wrong?</h2>
+  <p>This report is about your browser and your FM-1’s USB connection, nothing of your songs. It is shown only here and
+    goes nowhere unless you copy it and send it to the person helping you.</p>
+  <p><button id="report-copy" type="button">Copy the report</button> <span id="report-status" role="status"></span></p>
+  <textarea id="report-text" readonly rows="12" style="width:100%;font:12px/1.4 ui-monospace,Menlo,monospace" aria-label="The report"></textarea>
+</section>
+
 <section aria-labelledby="h-songs" id="songs" hidden>
   <h2 id="h-songs">Songs on the FM-1</h2>
   <p>Eight slots. For each, choose what should happen: one of our songs or your own file put there,
@@ -79,6 +87,6 @@
     <p><button id="ports-use" value="use">Use this one</button> <button value="cancel" class="quiet">Cancel</button></p>
   </form>
 </dialog>
-<script type="module" src="app.mjs"></script>
+<script type="module" src="app.mjs?v=1.0.1"></script>
 </body>
 </html>

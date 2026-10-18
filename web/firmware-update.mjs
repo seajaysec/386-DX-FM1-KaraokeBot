@@ -20,6 +20,10 @@ const UPGRADE = [0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7];
 const MAXDATA = 512;
 // port names probed without asking (substrings, any case); any other port only after the user picks it
 export const PRESET_PORTS = ["FM-1", "386DX", "Felucca", "OTA", "Composite", "SINCO", "USB-MIDI"];
+// the page can listen to what is sent and received (for a report when something goes wrong)
+let tracer = null;
+export function setTrace(fn) { tracer = fn; }
+const hex = (b) => Array.from(b.slice(0, 48), (x) => x.toString(16).padStart(2, "0")).join(" ") + (b.length > 48 ? ` …(${b.length} bytes)` : "");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const IS_OTA = (id) => /^ota-/i.test(id.model);
 
@@ -80,6 +84,7 @@ class Link {
   constructor(input, output) {
     this.input = input; this.output = output; this.q = []; this.waiter = null;
     input.onmidimessage = (ev) => {
+      if (tracer && !(ev.data.length === 1 && ev.data[0] >= 0xF8)) tracer(`rx ${input.name}: ${hex(ev.data)}`);
       if (ev.data[0] !== 0xF0) return;
       this.q.push(Array.from(ev.data));
       if (this.waiter) { const w = this.waiter; this.waiter = null; w(); }
@@ -88,7 +93,8 @@ class Link {
   get lost() { return this.input.state === "disconnected" || this.output.state === "disconnected"; }
   // false when the port is gone (unplugged): WebMIDI throws on a disconnected output
   send(bytes) {
-    try { this.output.send(bytes); return true; } catch (_) { return false; }
+    if (tracer) tracer(`tx ${this.output.name}: ${hex(bytes)}`);
+    try { this.output.send(bytes); return true; } catch (e) { if (tracer) tracer(`tx failed: ${e.message}`); return false; }
   }
   drain() { this.q.length = 0; }
   async read(ms) {
