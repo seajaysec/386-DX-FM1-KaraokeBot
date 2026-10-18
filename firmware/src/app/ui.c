@@ -1318,7 +1318,7 @@ static void step_write_chord(void)
     ui.step = (uint8_t)next;
 }
 
-/* Steps, as XY-1's: a white key is a step. Pressed, an empty step gets the remembered notes (Keys,
+/* Steps: a white key is a step. Pressed, an empty step gets the remembered notes (Keys,
  * Bass) or the drum shown (Drums); a step that has them loses them when the key comes up, unless
  * something was done while it was held: the knobs (its velocity, length, pitch), a later white key
  * (its note reaches that step), a black key (Drums: that drum on the step, or off) */
@@ -1778,7 +1778,7 @@ static void button_down(unsigned b)
             else
                 entry_back();
         } else if (ui.page == P_STEPS && !ui.srec && ui.track != T_VOICE) {
-            int bar = (int)ui.bar + (b == B_OCTUP ? 1 : -1);    /* the bar before or after, as XY-1 */
+            int bar = (int)ui.bar + (b == B_OCTUP ? 1 : -1);    /* the bar before or after */
             if (bar >= 0 && bar < song.bars)
                 ui.bar = (uint8_t)bar;
         } else if (ui.page == P_STEPS && ui.srec) {
