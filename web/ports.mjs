@@ -3,7 +3,7 @@
 // asks: a list of every MIDI port connected, the one picked is remembered in this browser. On a Mac a
 // port can carry another device's name (Audio MIDI Setup's cache), which is why the list exists.
 const KEY = '386dx.ports';
-const USUAL = /fm-1|386dx|felucca|ota|composite|sinco|usb-midi/i;
+const USUAL = /fm-?1|386dx|felucca|ota|update|composite|sinco|usb-?midi/i;
 
 export function rememberedNames() {
   try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; }

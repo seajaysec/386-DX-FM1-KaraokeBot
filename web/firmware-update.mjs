@@ -19,7 +19,8 @@ const HS_QUERY = [0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7];
 const UPGRADE = [0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7];
 const MAXDATA = 512;
 // port names probed without asking (substrings, any case); any other port only after the user picks it
-export const PRESET_PORTS = ["FM-1", "386DX", "Felucca", "OTA", "Composite", "SINCO", "USB-MIDI"];
+// "Update": the update loader on a Mac that names it from an earlier firmware ("Melodee Update")
+export const PRESET_PORTS = ["FM-1", "FM1", "386DX", "Felucca", "OTA", "Update", "Composite", "SINCO", "USB-MIDI"];
 // the page can listen to what is sent and received (for a report when something goes wrong)
 let tracer = null;
 export function setTrace(fn) { tracer = fn; }

@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 // The companion page: bring a karaoke song in, keep songs on the FM-1, install the firmware.
-import {readMidi} from './karaoke.mjs?v=1.0.3';
-import {planKaraoke} from './onboarding.mjs?v=1.0.3';
-import {songFromModel, songBytes7, decodeSong7} from './song7.mjs?v=1.0.3';
-import {Device} from './protocol.mjs?v=1.0.3';
-import {Engine} from './singing.mjs?v=1.0.3';
-import {Updater, IS_OTA, PRESET_PORTS, setTrace} from './firmware-update.mjs?v=1.0.3';
-import {pickPort, remember, rememberedNames, portNames} from './ports.mjs?v=1.0.3';
-import {productOf, logicalImage} from './firmware-package.mjs?v=1.0.3';
+import {readMidi} from './karaoke.mjs?v=1.0.4';
+import {planKaraoke} from './onboarding.mjs?v=1.0.4';
+import {songFromModel, songBytes7, decodeSong7} from './song7.mjs?v=1.0.4';
+import {Device} from './protocol.mjs?v=1.0.4';
+import {Engine} from './singing.mjs?v=1.0.4';
+import {Updater, IS_OTA, PRESET_PORTS, setTrace} from './firmware-update.mjs?v=1.0.4';
+import {pickPort, remember, rememberedNames, portNames} from './ports.mjs?v=1.0.4';
+import {productOf, logicalImage} from './firmware-package.mjs?v=1.0.4';
 
 const $ = id => document.getElementById(id);
 const say = (id, text) => { $(id).textContent = text; };
