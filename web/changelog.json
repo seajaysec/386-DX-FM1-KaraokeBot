@@ -1,6 +1,17 @@
 [
   {
     "version": "1.0",
+    "label": "Public Release Candidate 2",
+    "build": "0b582d8",
+    "date": "2026-10-18",
+    "notes": [
+      "Sync puts songs straight into their slots, and no longer resets the FM-1 when it saves a song just after sending it. The song you are playing or editing is left alone.",
+      "Reading, listing and emptying slots wait while the FM-1 is preparing its voice, instead of risking a reset.",
+      "This page needs this version: an FM-1 on the first release candidate is offered the update."
+    ]
+  },
+  {
+    "version": "1.0",
     "label": "Public Release Candidate",
     "build": "21eefb6",
     "date": "2026-10-18",

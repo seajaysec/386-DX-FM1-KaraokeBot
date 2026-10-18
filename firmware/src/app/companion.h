@@ -7,14 +7,14 @@
  *   3  encoder, delta + 64            a turn from the page (no reply)
  *  32  -                              status: "386DX", protocol, playing, page, track, slot, unsaved,
  *                                     tempo LE7x2, the row and note sung, the song's name
- *  40  size LE7x2, hash LE7x5         start sending a song (stopped; the song there is kept first,
- *                                     error 4: the slots are full)
+ *  40  size LE7x2, hash LE7x5, slot  start sending a song to a slot (stopped; the song being played or
+ *                                     edited is not touched)
  *  41  offset LE7x2, bytes as pairs   a piece of it
- *  42  -                              the end: checked, then it is the song (error 3: not a 386DX song)
+ *  42  -                              the end: checked, then written to the slot (error 3: not a 386DX song)
+ *  Flash is not touched while the voice is being prepared: 42, 49 (index 0), 50 and 51 reply error 5, ask again
  *  43  offset LE7x2                   read the song: error, size LE7x2, count, bytes as pairs
  *  44  text                           syllables the speech engine finds: count (127: none)
  *  45  text                           the same, and each syllable's shortest length, ms LE7x2
- *  46  slot                           save the song to slot 0..7
  *  47  -                              stop
  *  49  index                          the eight slots: error, total, index, kind (1 song, 2 empty),
  *                                     name
@@ -24,10 +24,10 @@
  *  52                                 restart (a soft reset once answered, as at power-on)
  *  50  slot, offset LE7x3             a slot's stored bytes as they are (for a download):
  *                                     error, length LE7x3, count, bytes as pairs */
-#define PROTOCOL 7
+#define PROTOCOL 8
 static uint16_t rx_at, rx_size;
-static uint32_t rx_hash, rx_expected, rx_time;
-static uint8_t rx_on;
+static uint32_t rx_expected, rx_time;
+static uint8_t rx_on, rx_slot;
 
 static void companion_send(const uint8_t *p, unsigned n)
 {
@@ -55,13 +55,23 @@ static uint32_t rd7(const uint8_t *p, unsigned n)
     return v;
 }
 
-static int busy_for_song(void) { return eng_playing || vocal_preparing || ui.words || ui.ask; }
+static int busy_for_song(void) { return eng_playing || ui.words || ui.ask; }
+/* the speech engine runs on the second core from flash, and a flash access (a write, an erase, even a
+ * read) stops it: while it works the main loop is still answering the page, so a request that touches
+ * flash is told to ask again (reply 5) */
+static int speech_busy(void) { return vocal_preparing || dx_speech_active(); }
 
 static void companion_reply(const uint8_t *c, unsigned n)
 {
     uint8_t r[200] = {0xF0, 0x7D, 0x4F, 0x4D};
     unsigned i = 4;
     r[i++] = c[0];
+    if (speech_busy() && (c[0] == 42 || c[0] == 50 || c[0] == 51 || (c[0] == 49 && !c[1]))) {
+        r[i++] = 5;
+        r[i++] = 0xF7;
+        companion_send(r, i);
+        return;
+    }
     switch (c[0]) {
     case 32: {
         memcpy(r + i, "386DX", 5);
@@ -84,19 +94,16 @@ static void companion_reply(const uint8_t *c, unsigned n)
     }
     case 40: {
         uint32_t size = rd7(c + 1, 2);
-        unsigned err = busy_for_song() ? 1 : size != sizeof song ? 3 : 0;
-        if (!err && keep_song() != 0)                 /* the song playing is kept before it is replaced */
-            err = 4;
+        unsigned err = busy_for_song() ? 1 : n != 9 || size != sizeof song || c[8] >= SONG_SLOTS ? 3 : 0;
         r[i++] = (uint8_t)err;
         if (!err) {
             rx_on = 1;
             rx_size = (uint16_t)size;
             rx_at = 0;
-            rx_hash = 2166136261u;
+            rx_slot = c[8];
             rx_expected = rd7(c + 3, 5);
             rx_time = plat_ms();
-            engine_play(0, 0);
-            memcpy(&undo_song, &song, sizeof song);    /* the song arrives here; the current one is kept */
+            ui.undo_valid = ui.redo_valid = 0;         /* the song arrives in the undo buffer */
         }
         break;
     }
@@ -106,26 +113,29 @@ static void companion_reply(const uint8_t *c, unsigned n)
         r[i++] = (uint8_t)err;
         if (!err) {
             uint8_t *dst = (uint8_t *)&undo_song;
-            for (unsigned j = 0; j < take; j++) {
-                uint8_t b = (uint8_t)(c[3 + j * 2] | c[4 + j * 2] << 7);
-                dst[rx_at++] = b;
-                rx_hash = (rx_hash ^ b) * 16777619u;
-            }
+            for (unsigned j = 0; j < take; j++)
+                dst[rx_at++] = (uint8_t)(c[3 + j * 2] | c[4 + j * 2] << 7);
             rx_time = plat_ms();
         }
         break;
     }
-    case 42: {
-        unsigned err = !rx_on || busy_for_song() ? 1 : rx_at != rx_size || rx_hash != rx_expected || !song_valid(&undo_song) ? 3 : 0;
+    case 42: {                                        /* the song goes to its slot from the buffer: no scratch song */
+        unsigned err = !rx_on || busy_for_song() ? 1 : rx_at != rx_size || !song_valid(&undo_song) ? 3 : 0;
+        if (!err) {
+            uint32_t h = 2166136261u;                  /* what the page sent, and what edits left in the buffer */
+            for (unsigned j = 0; j < sizeof song; j++)
+                h = (h ^ ((const uint8_t *)&undo_song)[j]) * 16777619u;
+            if (h != rx_expected)
+                err = 3;
+        }
         rx_on = 0;
+        if (!err && plat_store_save(OBJ_BANK0 + rx_slot, &undo_song, sizeof song) != 0)
+            err = 2;
         r[i++] = (uint8_t)err;
         if (!err) {
-            memcpy(&song, &undo_song, sizeof song);
-            ui.slot = -1;
-            song_loaded();
-            ui.dirty = 1;
-            done("SONG RECEIVED", song.name);
-            ui.page = P_SING;
+            if (ui.slot == (int8_t)rx_slot)            /* the song being edited came from this slot: it is the new one */
+                load_entry(rx_slot);
+            slots_read();
         }
         break;
     }
@@ -162,13 +172,6 @@ static void companion_reply(const uint8_t *c, unsigned n)
                 for (unsigned j = 0; j < (unsigned)count; j++)
                     i += le7(r + i, minimum[j], 2);
         }
-        break;
-    }
-    case 46: {
-        unsigned err = n != 2 || c[1] >= SONG_SLOTS ? 3 : eng_playing ? 1 : 0;
-        if (!err && save_slot(c[1]) != 0)
-            err = 2;
-        r[i++] = (uint8_t)err;
         break;
     }
     case 51:                                          /* a slot emptied; the song playing stays */
