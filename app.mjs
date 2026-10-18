@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 // The companion page: bring a karaoke song in, keep songs on the FM-1, install the firmware.
-import {readMidi} from './karaoke.mjs?v=1.0.4';
-import {planKaraoke} from './onboarding.mjs?v=1.0.4';
-import {songFromModel, songBytes7, decodeSong7} from './song7.mjs?v=1.0.4';
-import {Device} from './protocol.mjs?v=1.0.4';
-import {Engine} from './singing.mjs?v=1.0.4';
-import {Updater, IS_OTA, PRESET_PORTS, setTrace} from './firmware-update.mjs?v=1.0.4';
-import {pickPort, remember, rememberedNames, portNames} from './ports.mjs?v=1.0.4';
-import {productOf, logicalImage} from './firmware-package.mjs?v=1.0.4';
+import {readMidi} from './karaoke.mjs?v=1.0.5';
+import {planKaraoke} from './onboarding.mjs?v=1.0.5';
+import {songFromModel, songBytes7, decodeSong7} from './song7.mjs?v=1.0.5';
+import {Device} from './protocol.mjs?v=1.0.5';
+import {Engine} from './singing.mjs?v=1.0.5';
+import {Updater, IS_OTA, PRESET_PORTS, setTrace} from './firmware-update.mjs?v=1.0.5';
+import {pickPort, remember, rememberedNames, portNames} from './ports.mjs?v=1.0.5';
+import {productOf, logicalImage} from './firmware-package.mjs?v=1.0.5';
 
 const $ = id => document.getElementById(id);
 const say = (id, text) => { $(id).textContent = text; };
@@ -282,8 +282,7 @@ async function sync() {
         const bytes = await makeSong(c.from.data ?? await (await fetch(library[c.from.library].source)).arrayBuffer(),
           c.name, c.from.data ? undefined : library[c.from.library].melody);
         step(`${c.name}: sending to S${slot + 1}`);
-        await device.sendSong(bytes);
-        await device.saveSlot(slot);
+        await device.sendSong(slot, bytes);
       }
       pending.delete(slot);
       bar.value = ++done / jobs.length;
