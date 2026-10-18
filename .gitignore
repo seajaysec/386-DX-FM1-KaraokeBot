@@ -1,0 +1,6 @@
+/build/
+/vendor/
+/web/firmware/
+.DS_Store
+__pycache__/
+*.o

@@ -1,0 +1,93 @@
+[
+  {
+    "name": "Old MacDonald Had a Farm",
+    "source": "songs/library/01-old-macdonald-had-a-farm.kar",
+    "local": true,
+    "melody": 5,
+    "deviceName": "Old MacDonald"
+  },
+  {
+    "name": "Skip to My Lou",
+    "source": "songs/library/02-skip-to-my-lou.kar",
+    "local": true,
+    "melody": 3,
+    "deviceName": "Skip to My Lou"
+  },
+  {
+    "name": "Oh, My Darling Clementine",
+    "source": "songs/library/03-oh-my-darling-clementine.kar",
+    "local": true,
+    "melody": 7,
+    "deviceName": "Clementine"
+  },
+  {
+    "name": "Take Me Out to the Ball Game",
+    "source": "songs/library/04-take-me-out-to-the-ball-game.kar",
+    "local": true,
+    "melody": 3,
+    "deviceName": "Take Me Out"
+  },
+  {
+    "name": "Auld Lang Syne",
+    "source": "songs/library/05-auld-lang-syne.kar",
+    "local": true,
+    "melody": 13,
+    "deviceName": "Auld Lang Syne"
+  },
+  {
+    "name": "Jingle Bells",
+    "source": "songs/library/06-jingle-bells.kar",
+    "local": true,
+    "melody": 3,
+    "deviceName": "Jingle Bells"
+  },
+  {
+    "name": "She’ll Be Comin’ Round the Mountain",
+    "source": "songs/library/07-she-ll-be-comin-round-the-mountain.mid",
+    "local": true,
+    "melody": 7,
+    "deviceName": "Round the Mountain"
+  },
+  {
+    "name": "It’s a Long Way to Tipperary",
+    "source": "songs/library/08-it-s-a-long-way-to-tipperary.mid",
+    "local": true,
+    "melody": 7,
+    "deviceName": "Tipperary"
+  },
+  {
+    "name": "Stardust",
+    "source": "songs/library/09-stardust.kar",
+    "local": true,
+    "melody": 8,
+    "deviceName": "Stardust"
+  },
+  {
+    "name": "It Had to Be You",
+    "source": "songs/library/10-it-had-to-be-you.mid",
+    "local": true,
+    "melody": 7,
+    "deviceName": "It Had to Be You"
+  },
+  {
+    "name": "Waltzing Matilda",
+    "source": "songs/library/11-waltzing-matilda.mid",
+    "local": true,
+    "melody": 3,
+    "deviceName": "Waltzing Matilda"
+  },
+  {
+    "name": "Blow the Man Down",
+    "source": "songs/library/12-blow-the-man-down.mid",
+    "local": true,
+    "melody": 4,
+    "deviceName": "Blow the Man Down"
+  },
+  {
+    "name": "We Wish You a Merry Christmas",
+    "source": "songs/library/13-we-wish-you-a-merry-christmas.kar",
+    "local": true,
+    "melody": 6,
+    "deviceName": "Christmas Wish"
+  }
+]

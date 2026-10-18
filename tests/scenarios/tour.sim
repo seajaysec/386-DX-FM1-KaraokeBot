@@ -1,0 +1,41 @@
+# every page once, and the demo sung
+shot 01-sing-stopped
+expect page Sing
+tap PLAY
+wait 14000
+expect playing 1
+shot 02-sing-playing
+wait 300
+shot 02b-sing-playing
+expect sung 1
+tap HOME
+expect page Song
+shot 03-song
+tap SEQ
+turn ALGO 3
+shot 04-steps-drums
+turn ALGO -2
+shot 05-steps-keys
+tap EDIT
+expect page Sound
+shot 06-sound-keys
+tap ENV
+expect page Envelope
+shot 07-envelope-keys
+turn ALGO -1
+shot 08-envelope-voice
+tap EDIT
+shot 09-sound-voice
+tap FX
+shot 10-effects
+tap LFO
+shot 11-mixer
+tap GLO
+shot 12-setup
+tap ARP
+expect page Change
+turn ALGO 1
+shot 13-change
+tap PLAY
+expect playing 0
+expect misses 2

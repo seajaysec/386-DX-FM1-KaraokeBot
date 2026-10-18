@@ -1,0 +1,16 @@
+foreign
+# the first power-on of 386DX on an FM-1 that ran other firmware: its slots are cleared and
+# Greensleeves is saved in S1 and loaded; LOAD lists the eight slots
+expect saved 0
+expect empty 1
+expect empty 7
+expect slot 0
+expect page Sing
+shot 01-fresh
+tap PLAY
+wait 6000
+expect sung 1
+tap PLAY
+tap GLO
+tap SEL
+shot 02-load-list

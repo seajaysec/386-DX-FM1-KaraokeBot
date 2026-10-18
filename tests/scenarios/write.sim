@@ -1,0 +1,83 @@
+# a new song (it takes the first empty slot), a line typed, its notes played in, sung back, a second row singing the same line
+# GLO's list: LOAD, SAVE TO, NEW SONG, RENAME SONG
+tap GLO
+tap SEL
+turn SELECT 2
+tap SEL
+tap SEL
+expect page Song
+expect rows 0
+tap SEL
+tap SEL
+type hello robot friend
+shot 01-words
+tap SEL
+expect rows 1
+expect line_text 0 hello robot friend
+expect dirty 0
+expect msg KEPT
+tap REC
+expect msg 5 SYLLABLES
+key 7 150
+key 9 150
+key 11 150
+key 12 150
+key 14 150
+expect notes 5
+expect msg LAST SYLLABLE
+shot 02-entry
+tap REC
+tap PLAY
+wait 3500
+expect sung 1
+tap PLAY
+shot 03-song
+# a second row: the END row, NEW LINE, then PRESETS points it at line 1 (the same words and tune)
+turn SELECT 1
+tap SEL
+tap SEL
+tap HOME
+expect rows 2
+expect page Song
+turn PRESET -1
+expect line_text 1 hello robot friend
+shot 04-two-rows
+# HOME on Song: back to Sing (HOME and Song are one place's two views)
+tap HOME
+expect page Sing
+tap PLAY
+wait 8000
+tap PLAY
+expect misses 0
+# the Voice on Change: TRANSPOSE moves the Song cursor's line
+tap ARP
+expect page Change
+expect pitch 0 0 60
+turn K2 2
+expect pitch 0 0 62
+expect pitch 1 0 62
+turn K2 -2
+expect pitch 0 0 60
+# the new song has lived in S2 since it began (S1 holds Greensleeves): SAVE saves it there
+expect slot 1
+tap SAVE
+expect saved 1
+# MOVE: a third line, carried by SELECT to the top, dropped with SEL
+tap HOME
+tap HOME
+expect page Song
+turn SELECT 10
+tap SEL
+tap SEL
+type bye now
+tap SEL
+expect rows 3
+expect line_text 2 bye now
+tap SEL
+turn SELECT 3
+tap SEL
+turn SELECT -2
+shot 05-moving
+tap SEL
+expect msg MOVED
+expect line_text 0 bye now

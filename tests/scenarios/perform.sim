@@ -1,0 +1,142 @@
+# steps, recording, punch-in, mutes, undo, tempo, help cards, changing a pattern, saving and loading
+# on a new song (4/4, 100 BPM): GLO's list, NEW SONG, yes
+tap GLO
+tap SEL
+turn SELECT 2
+tap SEL
+tap SEL
+expect rows 0
+tap SEQ
+turn ALGO 3
+expect track Drums
+# black key 3 (low tom... lane 2): white keys toggle its steps
+key 6
+key 0
+key 4
+key 9
+shot 01-drum-steps
+tap PLAY
+wait 2500
+tap PLAY
+# keys: REC writes the cursor step, a chord when keys go down together
+turn ALGO -2
+expect track Keys
+tap REC
+expect msg WRITING STEPS
+keydown 7
+keydown 11
+keydown 14
+keyup 7
+keyup 11
+keyup 14
+key 9
+tap OCT+
+key 12
+tap REC
+shot 02-keys-steps
+# the white keys are the steps: SEQ held + keys sets the notes they write (D4 F4 A4), then step 16 gets them
+down SEQ
+keydown 9
+keydown 12
+keydown 16
+keyup 9
+keyup 12
+keyup 16
+up SEQ
+key 26
+key 26
+key 26
+expect step Keys 16 62
+shot 03-keys-white
+# undo the last writes and redo them
+down HOME
+tap REC
+up HOME
+expect msg UNDO
+expect step Keys 16 0
+down HOME
+tap PLAY
+up HOME
+expect msg REDO
+expect step Keys 16 62
+# tempo with HOME held and SELECT
+down HOME
+turn SELECT 8
+up HOME
+expect bpm 108
+# Change (ARP): SHIFT turns the keys one step later, TRANSPOSE moves them up
+tap ARP
+expect page Change
+turn K1 1
+expect step Keys 1 62
+expect step Keys 2 60
+turn K2 2
+expect step Keys 2 62
+shot 04-change
+# WEAVE: the drums of another pattern into this bar's
+turn ALGO 2
+expect track Drums
+tap SEL
+tap SEL
+expect msg WOVE P2 IN
+# the drums' envelope: FUNK pushes the hits late
+tap ENV
+expect page Envelope
+turn K1 20
+shot 05-drum-envelope
+# punch-in on the Effects page, while playing
+tap FX
+tap PLAY
+wait 1200
+keydown 9
+wait 600
+shot 06-punch-stutter
+keyup 9
+keydown 7
+wait 500
+keyup 7
+tap PLAY
+# mute the drums from anywhere: HOME + black key 4
+tap HOME
+down HOME
+key 8
+up HOME
+expect msg muted
+# a help card: SEQ held alone
+down SEQ 1200
+shot 07-card
+up SEQ
+# save to S3 with SAVE + white key 3, then load S3 from Setup's list
+down SAVE
+key 4
+up SAVE
+expect saved 2
+tap GLO
+tap SEL
+tap SEL
+turn SELECT -1
+shot 08-setup-list
+tap SEL
+expect slot 1
+expect page Sing
+shot 09-loaded
+# the effects keys: the first of each row of four is lit (white keys 1, 5, 9, 13 = keys 0, 7, 14, 21), the others dark
+tap FX
+expect key_led 0 1
+expect key_led 2 0
+expect key_led 4 0
+expect key_led 14 1
+expect key_led 21 1
+expect key_led 9 0
+# a punch-in key held: lit; let go: it blinks; two held together: both blink after
+keydown 9
+expect key_led 9 1
+keyup 9
+expect key_blinks 9
+keydown 11
+keydown 16
+keyup 11
+keyup 16
+expect key_blinks 11
+expect key_blinks 16
+expect key_led 9 0

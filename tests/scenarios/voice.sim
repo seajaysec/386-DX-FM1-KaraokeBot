@@ -1,0 +1,14 @@
+# the voice alone: the demo's lines, then held live syllables (the vowel loop) at three pitches
+solo Voice
+tap PLAY
+wait 16000
+tap PLAY
+tap HOME
+expect page Song
+key 7 1200
+wait 600
+key 14 1200
+wait 600
+key 2 2000
+wait 1000
+expect misses 0

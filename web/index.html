@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>386DX</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the page</a>
+<header>
+  <h1>386DX</h1>
+  <p>A singing robot for the M-VAVE FM-1: karaoke songs in, your own lines sung, four tracks to play.
+    <a href="emu/index.html">Try it in the browser</a>, no FM-1 needed.</p>
+</header>
+<main id="main">
+
+<section aria-labelledby="h-connect">
+  <h2 id="h-connect">Your FM-1</h2>
+  <p>Plug the FM-1 in with USB, open this page in Chrome or Edge, and connect. The browser asks for
+    permission to use MIDI devices.</p>
+  <p><button id="connect">Connect</button> <span id="device" role="status">Not connected.</span></p>
+  <p><button id="install" disabled>Install 386DX</button>
+    <progress id="install-progress" max="1" value="0" aria-label="Install progress" hidden></progress>
+    <span id="install-status" role="status"></span></p>
+  <p class="note">Installing keeps the songs in the FM-1's eight slots. Keep it charged and the cable
+    in until it restarts.</p>
+</section>
+
+<section aria-labelledby="h-new" id="whatsnew">
+  <h2 id="h-new">What’s new</h2>
+  <p id="new-intro" class="note">Every version, newest first. Connect your FM-1 and the ones it hasn’t got yet open up.</p>
+  <div id="changes"></div>
+</section>
+
+<section aria-labelledby="h-songs" id="songs" hidden>
+  <h2 id="h-songs">Songs on the FM-1</h2>
+  <p>Eight slots. For each, choose what should happen: one of our songs or your own file put there,
+    a download, or a delete. Then press Sync to do them all.</p>
+  <table>
+    <thead><tr><th scope="col">Slot</th><th scope="col">Holds</th><th scope="col">Change</th></tr></thead>
+    <tbody id="slots"><tr><td colspan="3">Connect to see them.</td></tr></tbody>
+  </table>
+  <p class="notice" id="sync-notice" hidden><strong>Keep the FM-1 on and plugged in while it syncs.</strong>
+    When it is done, the FM-1 restarts by itself.</p>
+  <p><button id="sync" disabled>Sync</button>
+    <progress id="sync-progress" max="1" value="0" aria-label="Sync progress" hidden></progress>
+    <span id="songs-status" role="status"></span></p>
+</section>
+
+</main>
+<footer>
+  <p class="note"><a href="https://github.com/seajaysec/386-DX-FM1-KaraokeBot/blob/main/docs/MANUAL.md">Manual</a> ·
+    <a href="https://github.com/seajaysec/386-DX-FM1-KaraokeBot">Firmware source</a> ·
+    <a href="https://github.com/seajaysec/386-DX-FM1-KaraokeBot/releases">Releases</a> ·
+    <a href="https://github.com/seajaysec/386-DX-ENGINE">386 DX Engine</a>, the voice, which this page runs in your browser.
+    Installing is at your own risk.</p>
+</footer>
+<dialog id="import-dialog" aria-labelledby="import-title">
+  <form method="dialog">
+    <h2 id="import-title">Import a song</h2>
+    <p>A karaoke file (.kar) or a MIDI file (.mid) with its words in it as timed lyrics: each syllable
+      at the note that sings it. The page finds the sung tune and turns the other parts into Keys, Bass
+      and Drums. Words in plain English letters; spell numbers out.</p>
+    <p><label for="import-file">Song file</label> <input id="import-file" type="file" accept=".kar,.mid,.midi"></p>
+    <p><button value="cancel" class="quiet">Cancel</button></p>
+  </form>
+</dialog>
+<dialog id="ports-dialog" aria-labelledby="ports-title">
+  <form method="dialog">
+    <h2 id="ports-title">Which one is your FM-1?</h2>
+    <p id="ports-why"></p>
+    <ul id="ports-list"></ul>
+    <p id="ports-none" hidden>No MIDI devices. Plug the FM-1 in with a USB data cable; it appears here.</p>
+    <p class="note">This page remembers the one you pick.</p>
+    <p><button id="ports-use" value="use">Use this one</button> <button value="cancel" class="quiet">Cancel</button></p>
+  </form>
+</dialog>
+<script type="module" src="app.mjs"></script>
+</body>
+</html>

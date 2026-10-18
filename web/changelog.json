@@ -1,0 +1,18 @@
+[
+  {
+    "version": "1.0",
+    "label": "Public Release Candidate",
+    "build": "21eefb6",
+    "date": "2026-10-18",
+    "notes": [
+      "Sings: import a karaoke (.kar) or MIDI song, or type a line on the FM-1 and play its notes on the keys; the voice is the 386 DX Engine, sung to your pitches and lengths.",
+      "Typing a line: the FM-1 counts its syllables, then you play a key for each one. Lines can be reordered, moved, and copied by reference, so a chorus is written once.",
+      "The face is the voice: it hops with the pitch, wobbles with vibrato, opens its mouth with the sound, and wears ^ ^ eyes on high notes and – – eyes on low ones.",
+      "Four tracks: Voice, Keys, Bass and Drums, with sound lists, a step sequencer (hold a step to edit it), live recording, tempo, and Voice settings you can change mid-song.",
+      "Sixteen punch-in effects under your fingers, several at once. The key lights show where you are (every fourth key) and blink the last one used.",
+      "Eight song slots with LOAD, SAVE TO, NEW SONG and RENAME SONG. Greensleeves is in S1 the first time it starts, and you can write over it.",
+      "This page installs and updates 386DX itself, puts songs into the slots, downloads or deletes them (queue the changes, then Sync), and runs the firmware in the browser.",
+      "Thirteen public-domain standards come with the page, ready to put in a slot."
+    ]
+  }
+]
