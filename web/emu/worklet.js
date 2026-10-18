@@ -67,7 +67,7 @@ class Fm1 extends AudioWorkletProcessor {
   publish() {
     const ex = this.ex;
     const blits = ex.web_blits();
-    const msg = { type: "frame", buttons: ex.web_lit_buttons() >>> 0, keys: ex.web_lit_keys() >>> 0 };
+    const msg = { type: "frame", buttons: ex.web_lit_buttons() >>> 0, keys: ex.web_lit_keys() >>> 0, typing: ex.web_typing ? ex.web_typing() : 0 };
     if (this.frames >= 44100) {                       // the share of real time spent running the device
       msg.load = Math.round(100 * this.busy / (this.frames / 44.1));
       this.busy = this.frames = 0;

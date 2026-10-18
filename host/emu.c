@@ -75,6 +75,7 @@ EXPORT uint16_t *web_fb(void)                       /* as the panel receives it:
         fb[i] = (uint16_t)(screen[i] >> 8 | screen[i] << 8);
     return fb;
 }
+EXPORT uint32_t web_typing(void) { return ui.words ? 1u : 0u; }   /* the FM-1 is asking for words or a name */
 EXPORT uint32_t web_blits(void) { return blit_count; }
 EXPORT uint32_t web_now(void) { return now; }
 EXPORT uint32_t web_cpu(void) { return 0; }

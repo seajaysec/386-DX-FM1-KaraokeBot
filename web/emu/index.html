@@ -40,11 +40,18 @@ a { color: var(--accent); }
 .device canvas { position: absolute; left: 31.8%; top: 9.6875%; width: 20%; height: 31.25%; background: #000; border-radius: 2px; }
 .ctl { cursor: pointer; }
 .ctl.knob { cursor: ns-resize; }
-.btnface { transition: fill .06s; }
+.btnface { transition: fill .06s; fill: var(--btn, #2e3135); stroke: var(--btn-line, #4a4d52); }
+.p-body { fill: var(--body, #3a3d42); } .p-tray { fill: var(--tray, #26282c); } .p-knob { fill: var(--knob, #1f2124); }
+:root[data-model="pink"] { --body: #e0529a; --tray: #4e2373; --knob: #2a1245; --btn: #8444cc; --btn-line: #b390ea; --kw: #c3a0f0; --kb: #a678e6; }
+text.kl { display: none; font: 700 22px 'Barlow Semi Condensed', Arial, sans-serif; fill: #2a1245; text-anchor: middle; pointer-events: none; }
+#panel.typing text.kl { display: inline; }
+.keyface.white { fill: var(--kw, #d9dadc); } .keyface.black { fill: var(--kb, #c9cacd); }
+.hint { color: var(--muted); font-size: .92rem; margin: .7rem 0 0; }
+.hint b { color: var(--ink); }
 .lit .btnface { fill: #f28a5a; }
 .lit text.btn { fill: #2a140a; }
 .held .btnface, .held .keyface { stroke: #f28a5a; stroke-width: 3; }
-.latched .btnface, .latched .keyface { stroke: #6fc3ff; stroke-width: 3; }
+.latched .btnface, .latched .keyface { stroke: #6fc3ff; stroke-width: 5; filter: drop-shadow(0 0 6px #6fc3ff); }
 .keyface { transition: fill .06s; }
 .lit .keyface.white { fill: #f6b48e; }
 .lit .keyface.black { fill: #4cc3b6; }
@@ -103,11 +110,14 @@ kbd { font: 600 .85em ui-monospace, Menlo, monospace; background: var(--card); b
   Page Up and Page Down faster. Space or Enter holds a button or key down while you hold it; Shift and Enter keeps it down
   until you press it again (with a mouse: Shift-click or right-click).</p>
 
+<p class="hint" id="hint"></p>
+
 <div class="bar">
   <span id="status" role="status">Off. Sound starts when you switch it on.</span>
   <span id="alert" role="alert"></span>
   <button id="mute" type="button" aria-pressed="false">Mute</button>
   <label class="keys"><input type="checkbox" id="shortcuts" checked> Keyboard shortcuts</label>
+  <button id="model" type="button" aria-pressed="false">Pink model</button>
   <span class="cpu" id="cpu"></span>
   <button id="reset" type="button" aria-describedby="reset-why">Factory reset</button>
   <span id="reset-why" class="sr">Forget what was saved and start again from the factory settings</span>
@@ -136,6 +146,7 @@ kbd { font: 600 .85em ui-monospace, Menlo, monospace; background: var(--card); b
 <script>
 "use strict";
 const NS = "http://www.w3.org/2000/svg";
+const TEXT_KEYS = "lambncopdqersftguhvwixjyzk ";       // the letter on each key when the FM-1 asks for words
 const BTN = { FX: 0, SEL: 1, ENV: 2, LFO: 3, EDIT: 4, GLO: 5, HOME: 6, SAVE: 7, ARP: 8, SEQ: 9, PLAY: 10, REC: 11, "OCT-": 12, "OCT+": 13 };
 const ENC = { SELECT: 0, ALGORITHM: 1, PRESETS: 2, KNOB1: 3, KNOB2: 4, KNOB3: 5, KNOB4: 6 };
 const WHITE_K = [0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24, 26];
@@ -162,12 +173,12 @@ function text(parent, x, y, s, size, fill = LABEL, weight = 600) {
 }
 
 // ---------------------------------------------------------------- the panel (a picture: aria-hidden)
-el("rect", { x: 4, y: 4, width: 992, height: 632, rx: 44, fill: BODY });
+el("rect", { x: 4, y: 4, width: 992, height: 632, rx: 44, fill: BODY, class: "p-body" });
 const knobs = {};
 function knob(x, y, r, label, role, name) {
   const g = el("g", { class: "ctl knob" });
-  el("circle", { cx: x, cy: y, r: r + 5, fill: TRAY }, g);
-  el("circle", { cx: x, cy: y, r, fill: KNOB, stroke: "#44474c", "stroke-width": 2 }, g);
+  el("circle", { cx: x, cy: y, r: r + 5, fill: TRAY, class: "p-tray" }, g);
+  el("circle", { cx: x, cy: y, r, fill: KNOB, class: "p-knob", stroke: "#44474c", "stroke-width": 2 }, g);
   const ind = el("line", { x1: x, y1: y - r + 5, x2: x, y2: y - r + 15, stroke: LABEL, "stroke-width": 3, "stroke-linecap": "round" }, g);
   text(g, x, y - r - 12, label, 17);
   el("circle", { cx: x, cy: y, r: r + 14, fill: "transparent" }, g);
@@ -188,26 +199,28 @@ function button(x, y, w, h, label, two) {
   else text(g, x + w / 2, y + h / 2 + 5, label, 15);
   buttons[label] = { g, bit: BTN[label], name: { "OCT-": "OCT minus", "OCT+": "OCT plus" }[label] || label, light: "" };
 }
-el("rect", { x: 58, y: 258, width: 210, height: 58, rx: 14, fill: TRAY });
+el("rect", { x: 58, y: 258, width: 210, height: 58, rx: 14, fill: TRAY, class: "p-tray" });
 button(72, 268, 82, 38, "OCT-"); button(170, 268, 82, 38, "OCT+");
 el("rect", { x: 300, y: 44, width: 236, height: 236, rx: 26, fill: "#111214" });
-el("rect", { x: 568, y: 160, width: 400, height: 140, rx: 18, fill: TRAY });
+el("rect", { x: 568, y: 160, width: 400, height: 140, rx: 18, fill: TRAY, class: "p-tray" });
 const ROW1 = ["FX", "SEL", "ENV", "LFO", "EDIT", "GLO"], ROW2 = ["HOME", "SAVE", "ARP", "SEQ", "PLAY", "REC"];
 for (let i = 0; i < 6; i++) button(582 + i * 63, 174, 54, 48, ROW1[i]);          // row by row: the reading order
 for (let i = 0; i < 6; i++) button(582 + i * 63, 236, 54, 48, ROW2[i], ROW2[i] === "PLAY" ? "STOP" : undefined);
 
 const keys = [];
 (function keybed(x0, y0, w, h) {
-  el("rect", { x: x0, y: y0, width: w, height: h, rx: 18, fill: TRAY });
+  el("rect", { x: x0, y: y0, width: w, height: h, rx: 18, fill: TRAY, class: "p-tray" });
   const pitch = (w - 24) / 16, kw = pitch * 0.78;
   BLACK_AFTER.forEach((a, k) => {                                                   // the black keys: the upper row
     const g = el("g", { class: "ctl" });
     el("rect", { x: x0 + 12 + (a + 1) * pitch - kw / 2, y: y0 + h * 0.06, width: kw, height: h * 0.33, rx: kw / 2, fill: KEY_B, class: "keyface black" }, g);
+    text(g, x0 + 12 + (a + 1) * pitch, y0 + h * 0.06 + h * 0.2, TEXT_KEYS[BLACK_K[k]].toUpperCase(), 22).setAttribute("class", "kl");
     keys[BLACK_K[k]] = { g, name: `Black key ${k + 1}`, light: "" };
   });
   for (let i = 0; i < 16; i++) {
     const g = el("g", { class: "ctl" });
     el("rect", { x: x0 + 12 + i * pitch + (pitch - kw) / 2, y: y0 + h * 0.43, width: kw, height: h * 0.52, rx: kw / 2, fill: KEY_W, class: "keyface white" }, g);
+    text(g, x0 + 12 + i * pitch + pitch / 2, y0 + h * 0.43 + h * 0.4, TEXT_KEYS[WHITE_K[i]] === " " ? "SPC" : TEXT_KEYS[WHITE_K[i]].toUpperCase(), 22).setAttribute("class", "kl");
     keys[WHITE_K[i]] = { g, name: `White key ${i + 1}` };
   }
 })(36, 340, 928, 270);
@@ -441,6 +454,46 @@ const KEYMAP = {};
 "1234567890".split("").forEach((c, i) => KEYMAP["Digit" + c] = { key: BLACK_K[i] });
 KEYMAP.Minus = { key: BLACK_K[10] };
 Object.assign(KEYMAP, { KeyP: { btn: BTN.PLAY }, KeyO: { btn: BTN.REC }, Escape: { btn: BTN.HOME }, KeyZ: { btn: BTN["OCT-"] }, KeyX: { btn: BTN["OCT+"] } });
+// when the FM-1 asks for words (a line, a name), the computer's keyboard types them: each letter presses the key
+// the FM-1 has it on (shown on the pads), Enter is SEL, Backspace is OCT-, the left and right arrows move the cursor
+let typing = false;
+const HINT = 'Combos: hold one control and press another (two fingers or the mouse and a key). <b>Right-click</b> or Shift-click keeps a control held; click it again to let go.';
+const HINT_TYPING = '<b>Typing:</b> type on your keyboard. Enter is SEL, Backspace deletes, the arrows move the cursor, Esc is HOME.';
+function setTyping(on) {
+  if (on === typing) return;
+  typing = on;
+  svg.classList.toggle("typing", on);
+  $("hint").innerHTML = on ? HINT_TYPING : HINT;
+}
+$("hint").innerHTML = HINT;
+addEventListener("keydown", (e) => {
+  if (!typing || !node || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || "")) return;
+  const c = e.key.length === 1 ? TEXT_KEYS.indexOf(e.key.toLowerCase()) : -1;
+  let kind, v;
+  if (c >= 0) { kind = "key"; v = c; }
+  else if (e.key === "Backspace") { kind = "btn"; v = BTN["OCT-"]; }
+  else if (e.key === "Enter") { kind = "btn"; v = BTN.SEL; }
+  else if (e.key === "Escape") { kind = "btn"; v = BTN.HOME; }
+  else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    turn(knobs.KNOB1, e.key === "ArrowRight" ? 1 : -1);
+    e.preventDefault(); e.stopPropagation();
+    return;
+  } else return;
+  e.preventDefault(); e.stopPropagation();
+  if (e.repeat) return;
+  holdDown("t" + e.code, kind, v);
+}, true);
+addEventListener("keyup", (e) => letGo("t" + e.code));
+// the model: black, or pink with purple pads
+function applyModel() {
+  const pink = prefs.model === "pink";
+  document.documentElement.dataset.model = pink ? "pink" : "black";
+  $("model").setAttribute("aria-pressed", pink ? "true" : "false");
+  $("model").textContent = pink ? "Black model" : "Pink model";
+}
+$("model").addEventListener("click", () => { prefs.model = prefs.model === "pink" ? "black" : "pink"; savePrefs(); applyModel(); });
+applyModel();
 const shortcuts = $("shortcuts");
 if (prefs.shortcuts === false) shortcuts.checked = false;
 shortcuts.addEventListener("change", () => { prefs.shortcuts = shortcuts.checked; savePrefs(); });
@@ -651,6 +704,7 @@ async function switchOn() {
         else if (m.type === "frame") {
           if (m.fb) drawScreen(m.fb);
           drawLights(m.buttons, m.keys);
+          setTyping(!!m.typing);
           if (m.said) onSaid(m.said);
           window.emuLast = m;
           if (m.load !== undefined) cpu.textContent = `386DX uses ${m.load}% of this computer's time`;
