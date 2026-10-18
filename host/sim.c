@@ -291,6 +291,15 @@ int main(int argc, char **argv)
                        song.line[song.row[r].line].count, line_span(&song, song.row[r].line));
         } else if (!strcmp(cmd, "mark")) {
             printf("MARK %u %s\n", (unsigned)sim_ms, line + 5);   /* a caption for the trailer's editor */
+        } else if (!strcmp(cmd, "dumpslot")) {
+            /* a slot's bytes into a file: dumpslot N PATH */
+            static uint8_t buf[sizeof song];
+            int got = plat_store_load(OBJ_BANK0 + (unsigned)atoi(a), buf, sizeof buf);
+            FILE *f = fopen(b, "wb");
+            if (f && got == (int)sizeof buf)
+                fwrite(buf, 1, sizeof buf, f);
+            if (f)
+                fclose(f);
         } else if (!strcmp(cmd, "foreign")) {
             /* handled before power-on */
         } else if (!strcmp(cmd, "wait")) {

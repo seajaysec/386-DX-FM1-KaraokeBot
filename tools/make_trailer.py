@@ -190,16 +190,12 @@ for enc, n in (("K1", 40), ("K2", 25)):
 tap("HOME")
 say("wait 1500")
 
-# --- the finish: stop, and play "nice to meet you all" once more from its row; on "all" (tick 64) a tape-off
+# --- the finish: the song plays on and comes round to "nice to meet you all"; on "all" (tick 64) a tape-off,
+# held through the fade so nothing of the next line gets in
 mark("tape off")
-say("tap PLAY")
-tap("HOME")                               # Song: its rows
-turn("SELECT", -2)                        # the row, "nice to meet you all"
-say("tap PLAY")
-tap("HOME")                               # the robot
-say("waittick 63", "down HOME", "keydown 14", "wait 2100", "keyup 14", "up HOME", "wait 500")
+say("waittick 62", "down HOME", "keydown 14", "wait 3300")
 mark("end")
-say("tap PLAY", "wait 600")
+say("wait 600")
 
 script = work / "trailer.sim"
 script.write_text("\n".join(S) + "\n")

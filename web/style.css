@@ -34,3 +34,5 @@ tr.pending td, tr.pending th { background: #fbe3d6; }
 #changes code { background: var(--paper); border-radius: 4px; padding: 0 0.3rem; }
 #changes ul { margin: 0.4rem 0 0.2rem; padding-left: 1.2rem; }
 footer { max-width: 46rem; margin: 0 auto; padding: 1rem 1.25rem 2rem; }
+.video { max-width: 46rem; margin: 0 auto; padding: 1rem 1.25rem 0; }
+.video iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; background: #000; }
