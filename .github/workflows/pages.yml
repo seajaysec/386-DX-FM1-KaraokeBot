@@ -1,0 +1,69 @@
+# The web page (https://386dx.linecross.ing): web/ as it is on main, with the firmware of the newest
+# release beside it in firmware/ (the page installs that package and compares its build). Runs on
+# every push to main that touches the page, the licences or this file, and when a release is published.
+name: Web page
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "LICENSE", "LICENSING.md", "LICENSES/**", ".github/workflows/pages.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Assemble the page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir site
+          cp -R web/. site/
+          find site -name '*.c' -delete
+          touch site/.nojekyll
+          echo 386dx.linecross.ing > site/CNAME
+          # the newest release that is not a pre-release: its package, and its licences
+          tag=$(gh release view --json tagName -q .tagName)
+          title=$(gh release view "$tag" --json name -q .name)
+          mkdir -p site/firmware/LICENSES
+          gh release download "$tag" --pattern '*.fwsc' --output site/firmware/386dx.fwsc
+          cp LICENSE LICENSING.md site/firmware/
+          cp LICENSES/*.txt site/firmware/LICENSES/
+          # what the page reads: the build (from the release title, "386DX 1.0.2 (0020fa2)"), the package
+          # identity (FM-1_386 + major, minor, patch as two digits each) and the checksum
+          python3 - "$tag" "$title" <<'PY'
+          import hashlib, json, re, sys
+          tag, title = sys.argv[1:]
+          v = re.fullmatch(r"v(\d+)\.(\d+)(?:\.(\d+))?(-.*)?", tag)
+          b = re.search(r"\(([0-9a-f]{7})\)", title)
+          if not v or not b:
+              sys.exit(f"release {tag!r} / {title!r}: expected vX.Y[.Z] and a (build) in the title")
+          pkg = open("site/firmware/386dx.fwsc", "rb").read()
+          about = {"version": b[1], "product": "FM-1_386%02d%02d%02d" % (int(v[1]), int(v[2]), int(v[3] or 0)),
+                   "sha256": hashlib.sha256(pkg).hexdigest()}
+          open("site/firmware/386dx.json", "w").write(json.dumps(about) + "\n")
+          print(about)
+          PY
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
