@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.0.2",
+    "label": "Lyrics on two lines",
+    "build": "0020fa2",
+    "date": "2026-10-18",
+    "notes": [
+      "A long lyric line breaks in two at a word edge, with the robot a little higher, so the whole line shows.",
+      "A rest of two bars or more shows a bar filling where the words go, like a karaoke video; for its last two half notes the next line's words come back."
+    ]
+  },
+  {
     "version": "1.0.1",
     "label": "Song import and sync",
     "build": "9569cf1",
