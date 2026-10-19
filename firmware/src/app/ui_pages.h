@@ -115,6 +115,27 @@ static void draw_footer(const char *const *parts, unsigned n)
 /* ---- Sing: the robot and the words ---- */
 /* the face's state, read once a frame: the screen is drawn in three bands, and each must draw the
  * same face */
+/* one character of FONT_S: its width, and drawn */
+static int ch_w(char ch)
+{
+    char c[2] = {ch, 0};
+    return g_tw(&FONT_S, c);
+}
+static void ch_put(int x, int y, char ch, uint16_t col)
+{
+    char c[2] = {ch, 0};
+    cv_text(x, y, &FONT_S, c, col);
+}
+
+/* the words, laid out once a frame like the face: the line, where it breaks in two (-1: one line),
+ * the word sung, and the width of the rest's bar (-1: no rest) */
+static struct {
+    const char *t;
+    int n, brk, word_at, word_end, bar;
+    int pw[SONG_TEXT + 1];               /* the width of the first i characters */
+} ly;
+static void lyric_frame(void);
+
 static void face_state(face_t *f)
 {
     static face_t frame;
@@ -124,6 +145,7 @@ static void face_state(face_t *f)
         return;
     }
     frame_at = ui.frame_at;
+    lyric_frame();
     static int16_t last_note = -1;
     static int8_t last_clip = -1;
     static uint8_t last_on;
@@ -146,41 +168,65 @@ static void face_state(face_t *f)
     frame = *f;
 }
 
-static void draw_lyric(int y)
+static void lyric_frame(void)
 {
-    int line = -1, word_at = -1, word_len = 0;
-    if (!eng_playing) {                       /* the words show while the song plays; stopped, its name */
-        g_center(0, y + 2, 240, &FONT_S, song.name, K_DIM);
+    int line;
+    ly.t = 0;
+    ly.brk = ly.bar = -1;
+    ly.word_at = ly.word_end = 0;           /* no word sung: an empty range */
+    if (!eng_playing)                         /* the words show while the song plays; stopped, the name */
         return;
-    }
-    if (eng_sing_row >= 0)
-        line = song.row[eng_sing_row].line;
-    else
-        line = focus_line();
+    line = song.row[eng_sing_row >= 0 ? eng_sing_row : 0].line;      /* before the first row: the first line */
     if (eng_sing_clip >= 0) {
-        const clip_t *c = &clips[eng_sing_clip];
-        word_at = c->word_at;
-        word_len = c->word_len;
+        ly.word_at = clips[eng_sing_clip].word_at;
+        ly.word_end = ly.word_at + clips[eng_sing_clip].word_len;
     }
-    if (line < 0 || !song.line[line].text[0]) {
-        g_center(0, y + 2, 240, &FONT_S, song.name, K_DIM);
+    /* a rest of two bars or more between lines: a bar fills where the words go, by the song's own clock;
+     * the last two half notes of it the bar is gone and the next line's words show */
+    unsigned t = eng_tick, from = 0, to = song.row[0].at;      /* (no rows: 0, no rest) */
+    if (eng_sing_row >= 0) {
+        const row_t *R = &song.row[eng_sing_row];
+        from = R->at + line_span(&song, R->line);
+        to = row_end(&song, (unsigned)eng_sing_row);
+    }
+    if (to >= from + 2 * song.steps && t >= from && t < to) {
+        if (t + 16 < to) {
+            ly.bar = 200u * (t - from) / (to - from);
+            return;
+        }
+        const row_t *N = &song.row[eng_sing_row + 1];
+        if (N < song.row + song.rows)
+            line = N->line;
+    }
+    if (line < 0 || !song.line[line].text[0])
         return;
+    /* a line too wide for the screen breaks at the space that leaves the two halves most even */
+    ly.t = song.line[line].text;
+    ly.pw[0] = 0;
+    for (ly.n = 0; ly.t[ly.n]; ly.n++) {
+        int i = ly.n;
+        ly.pw[i + 1] = ly.pw[i] + ch_w(ly.t[i]);
     }
-    const char *t = song.line[line].text;
-    /* the line, cut to fit around the word sung, the word in teal */
-    int n = (int)strlen(t), start = 0;
-    while (g_tw(&FONT_S, t + start) > 228 && start < n && (word_at < 0 || start + 6 < word_at))
-        start++;
-    int x = 6;
-    if (g_tw(&FONT_S, t + start) < 228)
-        x = (240 - g_tw(&FONT_S, t + start)) / 2;
-    for (int i = start; i < n && x < 234; i++) {
-        char c[2] = {t[i], 0};
-        int sung = word_at >= 0 && i >= word_at && i < word_at + word_len;
+    for (int i = 1, best = ly.pw[ly.n] > 228 ? 0x7fff : 0; i < ly.n; i++) {
+        int d = ly.pw[i] + ly.pw[i + 1] - ly.pw[ly.n];      /* left minus right */
+        d = d < 0 ? -d : d;
+        if (ly.t[i] == ' ' && d < best) {
+            best = d;
+            ly.brk = i;
+        }
+    }
+}
+
+/* one run of the line, ly.t[a..e), centred, the word sung in teal */
+static void lyric_run(int y, int a, int e)
+{
+    int x = (240 - (ly.pw[e] - ly.pw[a])) / 2;
+    for (int i = a; i < e; i++) {
+        int cw = ly.pw[i + 1] - ly.pw[i], sung = i >= ly.word_at && i < ly.word_end;
         if (sung)
-            g_rect(x - 1, y + 2, g_tw(&FONT_S, c) + 2, 20, K_TEAL_T);
-        cv_text(x, y, &FONT_S, c, sung ? K_TEAL : K_INK);
-        x += g_tw(&FONT_S, c);
+            g_rect(x - 1, y + 2, cw + 2, 20, K_TEAL_T);
+        ch_put(x, y, ly.t[i], sung ? K_TEAL : K_INK);
+        x += cw;
     }
 }
 
@@ -188,8 +234,18 @@ static void page_sing(void)
 {
     face_t f;
     face_state(&f);
-    face_draw(120, Y_MAIN, &f);
-    draw_lyric(Y_MAIN + 112);
+    int y = Y_MAIN + 112;
+    face_draw(120, Y_MAIN - (ly.brk >= 0 ? 18 : 0), &f);
+    if (ly.bar >= 0) {
+        g_rect(20, y + 8, 200, 8, K_RULE);
+        g_rect(20, y + 8, ly.bar, 8, K_TEAL);
+    } else if (!ly.t)
+        g_center(0, y + 2, 240, &FONT_S, song.name, K_DIM);
+    else {                                    /* one line, or two with the second where the one always sat */
+        int two = ly.brk >= 0;
+        for (int r = 0; r <= two; r++)
+            lyric_run(y - 20 * (two - r), r ? ly.brk + 1 : 0, r == two ? ly.n : ly.brk);
+    }
 }
 
 /* ---- Lines: the rows ---- */
@@ -210,8 +266,7 @@ static void page_lines_entry(void)
     int cur = ui.entry_syl < SONG_SYLLABLES && ui.offsets[ui.entry_syl] != 255 ? ui.offsets[ui.entry_syl] : -1;
     int cur_end = ui.entry_syl + 1u < syl && ui.offsets[ui.entry_syl + 1] != 255 ? ui.offsets[ui.entry_syl + 1] : n;
     for (int i = 0; i < n; i++) {
-        char c[2] = {t[i], 0};
-        int w = g_tw(&FONT_S, c);
+        int w = ch_w(t[i]);
         if (x + w > 232) {
             x = 8;
             y += 22;
@@ -219,7 +274,7 @@ static void page_lines_entry(void)
         int here = cur >= 0 && i >= cur && i < cur_end && t[i] != ' ';
         if (here)
             g_rect(x - 1, y + 2, w + 2, 20, K_CORAL_T);
-        cv_text(x, y, &FONT_S, c, here ? K_CORAL : i < (cur < 0 ? n : cur) ? K_INK : K_DIM);
+        ch_put(x, y, t[i], here ? K_CORAL : i < (cur < 0 ? n : cur) ? K_INK : K_DIM);
         x += w;
     }
     /* the tune so far: a bar a note, height by pitch */
@@ -612,13 +667,12 @@ static void draw_words(void)
             g_rect(x, y + 3, 2, 20, K_CORAL);
         if (i == n)
             break;
-        char c[2] = {ui.wtext[i], 0};
-        int w = g_tw(&FONT_S, c);
+        int w = ch_w(ui.wtext[i]);
         if (x + w > 232) {
             x = 8;
             y += 22;
         }
-        cv_text(x, y, &FONT_S, c, K_INK);
+        ch_put(x, y, ui.wtext[i], K_INK);
         x += w;
     }
     /* the key map: the letters as the keys lie, white keys below, black above. Landmark keys wear a
