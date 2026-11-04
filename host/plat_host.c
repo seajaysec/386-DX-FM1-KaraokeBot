@@ -34,21 +34,23 @@ static uint32_t led_b, led_k, red;
 uint32_t plat_ms(void) { return now; }
 /* as on the FM-1: a press that came and went between two looks still counts once, and the main loop is
  * away now and then (a sung clip being prepared, a song being written), so it does not look every ms */
-static uint32_t latch_b, latch_k, last_b, last_k, stall;
-void host_busy(unsigned ms) { if (!getenv("SIM_NOSTALL")) stall += ms; }
+static uint32_t latch_b, latch_k, last_b, last_k, stall, speak;
+/* a sung clip: the main loop waits for the second core, drawing the screen meanwhile (speech_background_service) */
+void host_busy(unsigned ms) { if (!getenv("SIM_NOSTALL")) speak += ms; }
 void host_wait_idle(void (*run)(uint32_t))
 {
-    while (stall)
+    while (stall || speak)
         run(10);
     run(60);                                      /* and one more look at the input */
 }
-void host_settled(void) { stall = 0; }               /* power-on is done: the setup's writes took no time */
+void host_settled(void) { stall = speak = 0; }               /* power-on is done: the setup's writes took no time */
 uint32_t plat_buttons(void)
 {
     uint32_t b = buttons | latch_b;
     latch_b = 0;
     return b;
 }
+uint32_t plat_keys_now(void) { return keys; }
 uint32_t plat_keys(void)
 {
     uint32_t k = keys | latch_k;
@@ -64,6 +66,7 @@ int32_t plat_enc(int role)
 uint32_t plat_master(void) { return 4096; }
 void plat_leds(uint32_t b, uint32_t k) { led_b = b; led_k = k; }
 uint32_t host_key_leds(void) { return led_k; }
+uint32_t host_button_leds(void) { return led_b; }
 void plat_glow(int on) { (void)on; }
 void plat_play_red(int r) { red = (uint32_t)r; }
 int plat_midi_in(uint32_t *p) { (void)p; return 0; }
@@ -90,7 +93,8 @@ int plat_store_save(uint32_t obj, const void *src, uint32_t len)
     memcpy(store[obj], src, len);
     store_len[obj] = (int)len;
     saves++;
-    host_busy(900);                               /* a flash write: erase and program take about a second */
+    if (!getenv("SIM_NOSTALL"))
+        stall += 900;                             /* a flash write: erase and program take about a second */
     return 0;
 }
 int plat_store_read(uint32_t obj, uint32_t offset, void *dst, uint32_t n)
@@ -127,7 +131,7 @@ static int host_boot(void)
     return 0;
 }
 
-/* one millisecond of the main loop: input, the service (MIDI, autosave, the sung clips), the screen */
+/* one millisecond of the main loop: input, the service (MIDI, a save waiting for the stop, the sung clips), the screen */
 static void host_ms(void)
 {
     now++;
@@ -137,6 +141,11 @@ static void host_ms(void)
     last_k = keys;
     if (stall) {                                  /* the loop is busy: time and the audio go on, input waits */
         stall--;
+        return;
+    }
+    if (speak) {                                  /* a clip being pronounced: input waits, the screen goes on */
+        speak--;
+        ui_draw();
         return;
     }
     ui_service();

@@ -44,14 +44,14 @@ uint32_t vocal_signature(void)
 {
     const uint8_t *v = song.voice;
     return (uint32_t)v[V_BODY] | (uint32_t)v[V_BREATH] << 7 | (uint32_t)v[V_EDGE] << 14 | (uint32_t)v[V_GLIDE] << 21 |
-           (uint32_t)v[V_OCTAVE] << 28 | (uint32_t)(song.bpm & 3u) << 30;
+           (uint32_t)(song.bpm & 3u) << 30 ^ (uint32_t)(v[V_OCTAVE] + 1u) * 0x9E3779B1u;
 }
 
 int vocal_find(uint16_t id)
 {
     uint32_t sig = vocal_signature();
     int stale = -1;
-    for (unsigned i = 0; i < CLIPS; i++)
+    for (unsigned i = 0; i < CLIPS && id != CLIP_NONE; i++)   /* (a free slot's id is CLIP_NONE: not a clip) */
         if (clips[i].id == id) {
             if (clips[i].signature == sig)
                 return (int)i;
@@ -79,6 +79,8 @@ static void want(uint16_t id, unsigned limit)
     wanted[nwanted++] = id;
 }
 
+static unsigned upto = ~0u;           /* the Voice chain's tick the song goes round at: nothing at or past it next */
+
 /* the groups a row sings from tick `from` on (in time order) */
 static void want_row(unsigned r, unsigned from, unsigned limit)
 {
@@ -90,7 +92,7 @@ static void want_row(unsigned r, unsigned from, unsigned limit)
     for (unsigned i = 0; i < L->count && nwanted < limit; i++) {
         const note_t *n = &song.note[L->first + i];
         unsigned at = R->at + n->at;
-        if (n->tie || at < from || at >= end)
+        if (note_tie(n) || at < from || at >= end || at >= upto)
             continue;
         want((uint16_t)(CLIP_SCORED | (L->first + i)), limit);
     }
@@ -120,13 +122,16 @@ static void collect(void)
         want(CLIP_AH, CLIPS);
     unsigned live = focus_line >= 0 && song.line[focus_line].text[0] ? 3u : 0u;
     if (eng_playing || cue >= 0) {
-        unsigned tick = cue >= 0 ? (unsigned)cue : eng_tick, limit = CLIPS - 1u - (live ? 1u : 0u);
+        unsigned now = cue >= 0 ? (unsigned)cue : eng_tick, tick = lane_tick(&song, T_VOICE, now);
+        unsigned limit = CLIPS - 1u - (live ? 1u : 0u);
         int r = row_at(&song, tick);
         for (unsigned pass = 0; pass < 2 && nwanted < limit; pass++) {
             unsigned start = pass ? 0 : (r < 0 ? 0 : (unsigned)r);
+            upto = pass ? ~0u : tick + song_ticks(&song) - now;   /* the song's end, if it comes before the chain's */
             for (unsigned k = start; k < song.rows && nwanted < limit; k++)
                 want_row(k, pass ? 0 : tick, limit);
         }
+        upto = ~0u;
         if (live)
             want(clip_live_id(focus_line, focus_syllable), CLIPS - 1u);
         return;
@@ -274,7 +279,7 @@ static int make(uint16_t id, int rank)
     dx_sing_note_t notes[DX_SING_NOTES];
     unsigned count = 0, native = 0, syllable, looped = 0, pitch_high = 0;
     const char *text;
-    int octave = ((int)song.voice[V_OCTAVE] - 1) * 12;
+    int octave = voice_register(&song);
     if (id == CLIP_AH || (id & CLIP_LIVE)) {
         unsigned line = (id >> 6) & 63u;
         static const char AH[SONG_TEXT] = "ah";   /* a whole line's room: word_of copies that much */

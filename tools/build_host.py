@@ -14,6 +14,8 @@ from prepare_espeak import prepare
 gen = root / 'build/gen'
 gen.mkdir(parents=True, exist_ok=True)
 subprocess.run([sys.executable, 'tools/gen_font.py', str(gen / 'felucca_font.h')], check=True)
+subprocess.run([sys.executable, 'tools/gen_cards.py', str(gen / 'cards.h')], check=True)
+subprocess.run([sys.executable, 'tools/gen_poem.py', str(gen / 'poem_data.h')], check=True)
 subprocess.run([sys.executable, 'tools/gen_songs.py'], check=True)
 speech = prepare(root)
 out = root / 'build/host'

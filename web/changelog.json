@@ -1,5 +1,23 @@
 [
   {
+    "version": "2.0",
+    "label": "SLAMJAM, phrases and the stage",
+    "build": "51dcd6c",
+    "date": "2026-11-03",
+    "notes": [
+      "SLAMJAM, a second mode (GLO's list): a band and a robot poet make it up as they go. Thirteen ways to tell a poem, fourteen topics and eight bands, from jazz bar and boom bap to bossa, trap and punk. Your song is kept and comes back when you switch.",
+      "In SLAMJAM, HOME is Practice, where the band rehearses, and FX is the SLAMJAM room, where the poet performs. The four knobs are the four players' styles; turn one to \"yours\" and that part is yours to play and record.",
+      "In the room the Voice's black keys give the poet a tune: play as many notes as the next line has syllables and he sings it to them.",
+      "Songs are written a phrase at a time and arranged into a song: SEQ shows the phrase, HOME + SEQ the song. Voice, Keys and Bass are written at a cursor: tap a key to write a note, hold it and turn SELECT to stretch it.",
+      "Every syllable needs a note: a phrase can't be left, nor the song saved, until its words and notes match, and the screen says how many are missing.",
+      "Hold any button alone for a help card: what the screen is and what every button and knob does there.",
+      "What you change is heard as you change it: a sound picked, a knob turned, a note the cursor lands on, the key's chord when ROOT or SCALE turns.",
+      "SCALE in GLO keeps every key you play in key, and the arpeggiator (ARP) plays Keys and Bass up and down their chords.",
+      "Mister Wiggles has a stage: the karaoke room, Sing and the Voice's pages put him in front of a wall of lit screens, and what you change shows on it.",
+      "Loading a song or switching modes while one plays stops it first; imported songs find their key; a few words that broke the voice are said properly now."
+    ]
+  },
+  {
     "version": "1.0.2",
     "label": "Lyrics on two lines",
     "build": "0020fa2",

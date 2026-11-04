@@ -26,7 +26,8 @@ enum { EN_SELECT, EN_ALGO, EN_PRESET, EN_K1, EN_K2, EN_K3, EN_K4, NE };
 
 uint32_t plat_ms(void);
 uint32_t plat_buttons(void);           /* held: bit B_* */
-uint32_t plat_keys(void);              /* held: bit k = key k (0 = F3) */
+uint32_t plat_keys(void);              /* held: bit k = key k (0 = F3), and quick taps since the last look */
+uint32_t plat_keys_now(void);          /* held this moment (a tap already let go is not) */
 int32_t plat_enc(int role);            /* detents since the last call, + = clockwise; EN_* */
 uint32_t plat_master(void);            /* MASTER pot, 0..4096 gain Q12 */
 void plat_leds(uint32_t buttons, uint32_t keys);   /* lit: bit B_*, bit key */

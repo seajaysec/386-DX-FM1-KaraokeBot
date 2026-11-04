@@ -16,12 +16,13 @@ typedef struct {               /* proportional, see tools/gen_font.py */
 } felucca_font_t;
 #include "felucca_font.h"
 
-#define CV_MAX (240u * 80u)       /* Three equal band transfers; no full framebuffer. */
+#define CV_MAX (240u * 80u)       /* no full framebuffer: two halves, one drawn while the other is sent */
 #ifdef DX_HOST
-static uint16_t cv_px[CV_MAX];
+static uint16_t cv_mem[CV_MAX] __attribute__((aligned(4)));
 #else
-static uint16_t cv_px[CV_MAX] __attribute__((section(".pool")));
+static uint16_t cv_mem[CV_MAX] __attribute__((aligned(4), section(".pool")));
 #endif
+static uint16_t *cv_px = cv_mem;
 static uint32_t cv_w, cv_h;
 static int32_t cv_oy;            /* y offset for graph drawing */
 static int32_t cv_y0, cv_y1;     /* X0X: the rows drawing may touch (cv_band) */
@@ -64,17 +65,32 @@ static inline uint16_t swap16(uint32_t c) { return (uint16_t)(((c >> 8) & 0xFFu)
 
 static void cv_begin(uint32_t w, uint32_t h, uint16_t bg)
 {
-    uint32_t i, n;
+    uint32_t n, pair, *d;
+    uint16_t sc;
     if (w * h > CV_MAX)
         h = CV_MAX / w;
-    lcd_sync();                     /* the last blit may still read cv_px */
+    /* a canvas of half the memory or less goes in the half the last one did not use: that one may still be
+     * going out to the screen (lcd_blit waits for it before sending this). A bigger one waits here */
+    if (w * h <= CV_MAX / 2u && cv_w * cv_h <= CV_MAX / 2u)
+        cv_px = cv_px == cv_mem ? cv_mem + CV_MAX / 2u : cv_mem;
+    else {
+        lcd_sync();                 /* the last blit may still read cv_px */
+        cv_px = cv_mem;
+    }
     cv_w = w;
     cv_h = h;
     cv_oy = cv_y0 = 0;
     cv_y1 = (int32_t)h;
+    sc = swap16(bg);
+    pair = (uint32_t)sc | ((uint32_t)sc << 16);
     n = w * h;
-    for (i = 0; i < n; i++)
-        cv_px[i] = swap16(bg);
+    d = (uint32_t *)cv_px;
+    while (n >= 2u) {
+        *d++ = pair;
+        n -= 2u;
+    }
+    if (n)
+        *(uint16_t *)d = sc;
 }
 
 /* X0X: draw the next things as if the canvas were rows y0 .. y0+h-1 alone (one band of a
@@ -103,7 +119,7 @@ static inline void cv_pset(int32_t x, int32_t y, uint16_t c)
 
 static void cv_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
 {
-    int32_t x1 = x + w, y1 = y + h + cv_oy, i;
+    int32_t x1 = x + w, y1 = y + h + cv_oy;
     uint16_t sc = swap16(c);
     y += cv_oy;                             /* clipped once, then filled row by row */
     if (x < 0)
@@ -114,9 +130,25 @@ static void cv_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
         x1 = (int32_t)cv_w;
     if (y1 > cv_y1)
         y1 = cv_y1;
-    for (; y < y1; y++)
-        for (i = x; i < x1; i++)
-            cv_px[(uint32_t)y * cv_w + (uint32_t)i] = sc;
+    for (; y < y1; y++) {
+        uint16_t *row = &cv_px[(uint32_t)y * cv_w + (uint32_t)x];
+        int n = x1 - x;
+        if (n <= 0)
+            continue;
+        if ((uintptr_t)row & 2u) {
+            *row++ = sc;
+            n--;
+        }
+        {
+            uint32_t pair = (uint32_t)sc | ((uint32_t)sc << 16), *d = (uint32_t *)row;
+            while (n >= 2) {
+                *d++ = pair;
+                n -= 2;
+            }
+            if (n > 0)
+                *(uint16_t *)d = sc;
+        }
+    }
 }
 
 static void cv_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c)

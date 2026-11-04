@@ -25,6 +25,7 @@ build/host/libc_strings
 "$CC" -O2 tests/storage_test.c -o build/host/storage_test
 build/host/storage_test
 "$PY" tests/klatt_regression.py
+"$PY" tools/check_poem.py                     # every word SLAMJAM can say, said under the sanitizers
 if [ "${1:-}" = --host-only ]; then exit 0; fi
 "$CC" -O2 tests/ota_test.c -o build/host/ota_test
 build/host/ota_test build/386dx.fwsc

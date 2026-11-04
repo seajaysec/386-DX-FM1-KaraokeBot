@@ -138,6 +138,7 @@ static void fx_states(fxslot_t *f)              /* a fresh effect: its states at
         f->pc[i] = f->pt[i];
 }
 
+#if FX_ALL_TYPES
 static void delay_time(fxslot_t *f)
 {
     float bpm = f->bpm > 20.0f ? f->bpm : 120.0f;
@@ -148,6 +149,7 @@ static void delay_time(fxslot_t *f)
         t *= 0.5f;                                                    /* still on the beat */
     f->pt[0] = t * SR;
 }
+#endif
 
 /* the knobs to the effect's numbers (its pt[]: what each means is in the effect's loop) */
 __attribute__((minsize)) static void fx_derive(fxslot_t *f)
@@ -186,12 +188,12 @@ __attribute__((minsize)) static void fx_derive(fxslot_t *f)
         f->pt[2] = 0.03f * fm_exp2f(c * 8.06f);                       /* rate 0.03 .. 8 Hz */
         f->pt[3] = 0.9f * d;                                          /* feedback */
         break;
-#endif
     case FXT_DELAY:
         delay_time(f);                                                /* size and fine */
         f->pt[2] = 0.95f * c;                                         /* feedback */
         f->pt[3] = d;                                                 /* dry through */
         break;
+#endif
     case FXT_REVERB:
         f->pt[0] = 0.5f * fm_exp2f(a * 1.926f);                       /* size: the combs x 0.5 .. 1.9 */
         f->pt[1] = 24.0f * b * b;                                     /* mod, samples of wander */
@@ -233,9 +235,13 @@ int fx_has(const fxslot_t *f, int type)
 {
     if (type == FXT_REVERB)
         return f->rv != 0;
+#if FX_ALL_TYPES
     if (type == FXT_DELAY)
         return f->dl != 0 && f->dr != 0;
     return type >= 0 && type < NFXT;
+#else
+    return 0;                                 /* (the reverb above is the one type built) */
+#endif
 }
 
 __attribute__((minsize)) void fx_set(fxslot_t *f, int type, const uint8_t knob[4])
@@ -246,10 +252,13 @@ __attribute__((minsize)) void fx_set(fxslot_t *f, int type, const uint8_t knob[4
     for (i = 0; i < 4; i++)
         f->knob[i] = knob[i] > 127 ? 127 : knob[i];
     if (type != f->type_t) {                  /* the lines the new effect reads are idle now: clear them */
+#if FX_ALL_TYPES
         if (type == FXT_DELAY) {
             zero16(f->dl, FX_DLY_LEN);
             zero16(f->dr, FX_DLY_LEN);
-        } else if (type == FXT_REVERB) {
+        } else
+#endif
+        if (type == FXT_REVERB) {
             zero16(f->rv, FX_RV_LEN);
         }
     }
@@ -261,12 +270,14 @@ void fx_tempo(fxslot_t *f, float bpm)
 {
     if (bpm > 20.0f && bpm != f->bpm) {
         f->bpm = bpm;
+#if FX_ALL_TYPES
         if (f->type_t == FXT_DELAY)
             delay_time(f);
+#endif
     }
 }
 
-void fx_filter(fxslot_t *f, int hp, int lp)
+__attribute__((minsize)) void fx_filter(fxslot_t *f, int hp, int lp)
 {
     f->hpv = (uint8_t)(hp < 0 ? 0 : hp > 127 ? 127 : hp);
     f->lpv = (uint8_t)(lp < 0 ? 0 : lp > 127 ? 127 : lp);
@@ -328,6 +339,7 @@ static inline float tap16(const int16_t *b, float rp)
     return a + (c - a) * fr;
 }
 
+#if FX_ALL_TYPES
 static void do_delay(fxslot_t *f, const float *x, float *ol, float *orr, int m, int any)
 {
     const float target = f->pt[0], fb = f->pc[2], dry = f->pc[3] * 0.7071f, tc = 0.35f;
@@ -370,6 +382,7 @@ static void do_delay(fxslot_t *f, const float *x, float *ol, float *orr, int m, 
     f->dlpr = fm_flush(lpr);
     f->dquiet = quiet;
 }
+#endif
 
 static void do_dist(fxslot_t *f, const float *x, float *ol, float *orr, int m)
 {
@@ -588,8 +601,8 @@ void fx_process(fxslot_t *f, const float *in, float *out_l, float *out_r, uint32
         case FXT_DIST: do_dist(f, x, out_l + o, out_r + o, m); break;
         case FXT_LOFI: do_lofi(f, x, out_l + o, out_r + o, m); break;
         case FXT_PHASER: do_phaser(f, x, out_l + o, out_r + o, m); break;
-#endif
         case FXT_DELAY: do_delay(f, x, out_l + o, out_r + o, m, any); break;
+#endif
         case FXT_REVERB: do_reverb(f, x, out_l + o, out_r + o, m, any); break;
         default: break;
         }
@@ -775,7 +788,7 @@ static float level_lin(int v)                 /* 0 .. 100 .. 127: silence, unity
 static float coef_ms(float t) { return fm_expf(-1000.0f / (t * SR)); }
 
 /* RBJ: a low shelf, a peak, a high shelf, gain in dB */
-static void biq_shelf(biq_t *q, float hz, float db, int high)
+__attribute__((minsize)) static void biq_shelf(biq_t *q, float hz, float db, int high)
 {
     float A = fm_exp2f(db * (3.3219281f / 40.0f)), w = FM_TWO_PI * hz / SR, cs = fm_cosf(w), sn = fm_sinf(w);
     float al = sn * 0.5f * 1.4142136f, sa = 2.0f * fm_sqrtf(A) * al, ia, c = high ? -cs : cs;

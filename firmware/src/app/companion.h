@@ -16,7 +16,7 @@
  *  44  text                           syllables the speech engine finds: count (127: none)
  *  45  text                           the same, and each syllable's shortest length, ms LE7x2
  *  47  -                              stop
- *  49  index                          the eight slots: error, total, index, kind (1 song, 2 empty),
+ *  49  index                          the eight slots: error, total, index, kind (1 song, 2 empty, 3 a 1.0 song),
  *                                     name
  *  51  slot                           the slot emptied: error
  *  53                                 the screen: page, list/words/ask bits, rows, row, notes, cpu, level, message, line,
@@ -24,7 +24,7 @@
  *  52                                 restart (a soft reset once answered, as at power-on)
  *  50  slot, offset LE7x3             a slot's stored bytes as they are (for a download):
  *                                     error, length LE7x3, count, bytes as pairs */
-#define PROTOCOL 8
+#define PROTOCOL 9
 static uint16_t rx_at, rx_size;
 static uint32_t rx_expected, rx_time;
 static uint8_t rx_on, rx_slot;
@@ -90,6 +90,9 @@ static void companion_reply(const uint8_t *c, unsigned n)
             r[i++] = (uint8_t)(song.name[j] & 127);
         for (const char *v = DX_BUILD; *v && i < 70; v++)    /* the build: older pages read only up to the name */
             r[i++] = (uint8_t)(*v & 127);
+        while (i < 70)
+            r[i++] = 0;
+        r[i++] = ui.poetry;                       /* the mode (GLO): 0 karaoke, 1 poetry; after the build's 28 */
         break;
     }
     case 40: {
@@ -195,7 +198,7 @@ static void companion_reply(const uint8_t *c, unsigned n)
         break;
     case 53: {                                        /* what the screen shows, for a test driver */
         r[i++] = ui.page;
-        r[i++] = (uint8_t)(ui.list | ui.words << 2 | (ui.ask ? 8 : 0) | ui.moving << 4 | ui.entry << 5 | ui.srec << 6);
+        r[i++] = (uint8_t)(ui.list | ui.words << 2 | (ui.ask ? 8 : 0) | ui.moving << 4);
         r[i++] = song.rows;
         r[i++] = ui.row;
         i += le7(r + i, song.notes, 2);
@@ -209,6 +212,10 @@ static void companion_reply(const uint8_t *c, unsigned n)
         r[i++] = ui.bar;
         r[i++] = (uint8_t)(song.track[0].mute | song.track[1].mute << 1 | song.track[2].mute << 2 | song.track[3].mute << 3);
         i += le7(r + i, vocal_misses > 16383u ? 16383u : vocal_misses, 2);
+        i += le7(r + i, ui.draw_ms, 2);
+        ui.draw_ms = 0;
+        i += le7(r + i, ui.gap_ms, 2);
+        ui.gap_ms = 0;
         break;
     }
     case 47:
@@ -224,7 +231,7 @@ static void companion_reply(const uint8_t *c, unsigned n)
         r[i++] = (uint8_t)index;
         if (index < total) {
             const char *name = ui.names[index];
-            r[i++] = (ui.present >> index & 1u) ? 1 : 2;
+            r[i++] = (ui.present >> index & 1u) ? (ui.old >> index & 1u ? 3 : 1) : 2;   /* 3: a 1.0 song */
             for (unsigned j = 0; j < 24; j++)
                 r[i++] = (uint8_t)(j < strlen(name) ? name[j] & 127 : 0);
         }

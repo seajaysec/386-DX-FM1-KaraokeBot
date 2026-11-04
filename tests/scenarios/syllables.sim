@@ -1,0 +1,66 @@
+foreign
+# the words and the notes: a note takes the next syllable; one past the last holds its vowel; a syllable with no
+# note keeps you on the Voice's phrase, and from saving, with a box that says how; shortening the words gives
+# the held notes back
+tap SAVE
+tap SEL
+turn SELECT 1
+tap SEL
+expect page Phrase
+down HOME
+tap SEQ
+up HOME
+type la la la
+tap SEL
+expect msg KEPT
+key 7
+key 9
+expect syllables 0 0 1
+# leaving, and saving, are refused until the third syllable has its note
+tap GLO
+expect page Phrase
+expect msg 1 MORE NOTE NEEDED
+tap HOME
+expect page Phrase
+tap SAVE
+tap SEL
+turn SELECT 1
+tap SEL
+expect page Phrase
+expect msg 1 MORE NOTE NEEDED
+# SAVE held saves where the song lives: refused too, and nothing is written
+down SAVE
+wait 900
+up SAVE
+expect msg 1 MORE NOTE NEEDED
+expect dirty 1
+# the cursor waits where the note goes
+key 11
+expect syllables 0 0 1 2
+# one too many: it holds the vowel
+key 12
+expect syllables 0 0 1 2 2+
+# fewer words: the notes past them are held vowels
+down HOME
+tap SEQ
+up HOME
+tap OCT-
+tap OCT-
+tap OCT-
+tap SEL
+expect syllables 0 0 1 1+ 1+
+# more words: the held notes at the end are given back
+down HOME
+tap SEQ
+up HOME
+type  la la
+tap SEL
+expect syllables 0 0 1 2 3
+# HOME + SEQ: the words, and again: kept, and the song
+down HOME
+tap SEQ
+up HOME
+down HOME
+tap SEQ
+up HOME
+expect page Song

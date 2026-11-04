@@ -1,83 +1,111 @@
-# a new song (it takes the first empty slot), a line typed, its notes played in, sung back, a second row singing the same line
-# GLO's list: LOAD, SAVE TO, NEW SONG, RENAME SONG
-tap GLO
+# a new song from SAVE's list (LOAD on an empty slot, S2) opens ready to write: the Voice's first phrase, the keys
+# writing at the cursor; its words typed, sung back; then the song's phrases (HOME + SEQ): added, duped, moved,
+# buffed out and in, resized and deleted
+tap SAVE
 tap SEL
-turn SELECT 2
+turn SELECT 1
 tap SEL
-tap SEL
-expect page Song
+expect page Phrase
+expect track Voice
+expect slot 1
 expect rows 0
+expect phrases Voice 1
+expect phrase_len Voice 0 4
+# a key tapped: a sixteenth at the cursor, which moves on; held while SELECT turns, the note stretches with it
+key 7
+key 9
+keydown 11
+turn SELECT 2
+keyup 11
+key 12
+keydown 14
+turn SELECT 3
+keyup 14
+expect rows 1
+expect notes 5
+shot 01-voice-cursor
+# the keys light with the notes at the cursor: steady where one starts, blinking inside one
+turn SELECT -10
+expect key_led 7 1
+turn SELECT 3
+expect key_blinks 11
+# its words: SEL, EDIT WORDS
 tap SEL
 tap SEL
 type hello robot friend
-shot 01-words
+shot 02-words
 tap SEL
-expect rows 1
 expect line_text 0 hello robot friend
-expect dirty 0
 expect msg KEPT
-tap REC
-expect msg 5 SYLLABLES
-key 7 150
-key 9 150
-key 11 150
-key 12 150
-key 14 150
+# the knobs work on the note at the cursor: NOTE, NUDGE
+turn SELECT -3
+turn K3 2
+turn K4 -1
+expect pitch 0 0 62
+expect nudge Voice 1 -1
+# a tap on the note at the cursor takes it away; another writes one again
+key 9
+expect notes 4
+key 7
 expect notes 5
-expect msg LAST SYLLABLE
-shot 02-entry
-tap REC
 tap PLAY
 wait 3500
 expect sung 1
 tap PLAY
-shot 03-song
-# a second row: the END row, NEW LINE, then PRESETS points it at line 1 (the same words and tune)
-turn SELECT 1
+shot 03-phrase
+# HOME + SEQ: the words, and again: the song. ADD a phrase after this one, the cursor on it
+down HOME
+tap SEQ
+up HOME
+down HOME
+tap SEQ
+up HOME
+expect page Song
 tap SEL
 tap SEL
-tap HOME
+expect msg ADDED
+expect phrases Voice 2
+# DUPE the first (its row sung again, the same line)
+turn SELECT -1
+tap SEL
+turn SELECT 2
+tap SEL
+expect msg DUPED
+expect phrases Voice 3
 expect rows 2
-expect page Song
-turn PRESET -1
-expect line_text 1 hello robot friend
-shot 04-two-rows
-# HOME on Song: back to Sing (HOME and Song are one place's two views)
-tap HOME
-expect page Sing
-tap PLAY
-wait 8000
-tap PLAY
-expect misses 0
-# the Voice on Change: TRANSPOSE moves the Song cursor's line
-tap ARP
-expect page Change
-expect pitch 0 0 60
-turn K2 2
-expect pitch 0 0 62
-expect pitch 1 0 62
-turn K2 -2
-expect pitch 0 0 60
-# the new song has lived in S2 since it began (S1 holds Greensleeves): SAVE saves it there
-expect slot 1
-tap SAVE
-expect saved 1
-# MOVE: a third line, carried by SELECT to the top, dropped with SEL
-tap HOME
-tap HOME
-expect page Song
-turn SELECT 10
+shot 04-arrange
+# MOVE: the dupe carried past the empty phrase, dropped with SEL
 tap SEL
+turn SELECT 4
 tap SEL
-type bye now
-tap SEL
-expect rows 3
-expect line_text 2 bye now
-tap SEL
-turn SELECT 3
-tap SEL
-turn SELECT -2
+turn SELECT 1
 shot 05-moving
 tap SEL
 expect msg MOVED
-expect line_text 0 bye now
+# Drums: BUFF OUT the beat, BUFF IN a copy after it, LENGTH makes the copy four bars
+turn ALGO 3
+expect track Drums
+tap SEL
+turn SELECT 6
+tap SEL
+expect msg BUFFED OUT
+tap SEL
+turn SELECT 7
+tap SEL
+expect msg BUFFED IN
+expect phrases Drums 2
+turn K4 3
+expect phrase_len Drums 1 4
+# DELETE it again, after a question
+tap SEL
+turn SELECT 3
+tap SEL
+tap SEL
+expect msg DELETED
+expect phrases Drums 1
+# the new song has lived in S2 since it began (S1 holds Greensleeves): SAVE held saves it there
+expect slot 1
+down SAVE 1500
+up SAVE
+expect saved 1
+expect msg SAVED

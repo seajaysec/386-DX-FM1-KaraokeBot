@@ -1,0 +1,232 @@
+foreign
+# SLAMJAM (GLO: SELECT, yes): a poem made; on the stage PLAY plays the band alone (the poet keeps quiet), and the knobs
+# change the players' styles while it plays
+tap GLO
+wait 600
+turn SELECT 1
+wait 300
+tap SEL
+wait 2500
+expect msg SLAMJAM MODE
+expect mode slamjam
+expect page Sing
+lyrics
+expect lines_clear 1
+tap PLAY
+waittick 66
+expect sung 0
+expect heard 1
+turn K4 -8
+wait 300
+turn K4 1
+wait 300
+expect msg SWING
+turn K2 -8
+wait 300
+turn K2 3
+wait 300
+expect msg ARP
+turn K1 -3
+wait 300
+turn K1 2
+wait 300
+expect msg RAP
+# the keys left to you: the band stops playing them, REC keeps what you play there
+turn K2 8
+wait 300
+expect msg YOURS
+turn K2 -5
+wait 300
+expect msg ARP
+expect lines_clear 1
+# HOME + a white key is no effect out of the room
+down HOME
+keydown 0
+wait 300
+expect punch 0 0
+keyup 0
+up HOME
+# into the room as it plays: the poet performs; a held black key gives him its pitch, let go it is his own again;
+# PLAY stops and starts there
+tap FX
+waittick 230
+expect playing 1
+expect sung 1
+# the Voice's black keys gather a tune: as many notes as the next line has syllables, and it sings them, folded into
+# his range
+key 13
+key 15
+key 17
+key 20
+key 22
+key 25
+key 22
+key 20
+key 17
+key 15
+key 13
+key 15
+key 17
+key 20
+key 22
+key 25
+key 22
+key 20
+key 17
+key 15
+key 13
+key 15
+key 17
+key 20
+expect msg YOUR TUNE
+# (played high, sung in his own low-middle range)
+expect tune_max 64
+tap PLAY
+wait 300
+expect playing 0
+expect page Karaoke
+# the room's fifth bank is the band: the players' styles, during the show
+turn SELECT 4
+wait 300
+expect layer 4
+turn K4 -8
+wait 300
+turn K4 1
+wait 300
+expect msg SWING
+turn SELECT -4
+wait 300
+# PRESETS in the room: the track's sound, said, and the header shows it
+turn ALGO 1
+turn PRESET 1
+wait 300
+expect msg Keys
+turn ALGO -1
+tap PLAY
+wait 7000
+expect playing 1
+expect sung 1
+tap HOME
+wait 300
+expect playing 0
+tap PLAY
+# the drums alone (the poet, keys and bass taken) are heard
+down HOME
+key 1
+key 3
+key 5
+up HOME
+wait 500
+expect heard 1
+wait 3000
+expect heard 1
+down HOME
+key 1
+key 3
+key 5
+up HOME
+tap PLAY
+# a new poem on the next topic: SEL on the stage
+tap SEL
+wait 300
+turn SELECT 1
+tap SEL
+wait 2500
+expect msg A NEW
+lyrics
+expect lines_clear 1
+# the SLAMJAM room: walking in plays the poem, walking out stops it; its tone keys and its snaps
+tap FX
+wait 300
+expect playing 1
+expect cards 1
+keydown 0
+wait 400
+expect punch 0 1
+keyup 0
+keydown 2
+wait 1500
+keyup 2
+keydown 4
+wait 600
+expect punch 2 1
+keyup 4
+keydown 6
+wait 600
+keyup 6
+keydown 19
+wait 1000
+expect punch 11 1
+keyup 19
+keydown 7
+wait 500
+keyup 7
+expect heard 1
+tap HOME
+wait 300
+expect playing 0
+# a poem saved keeps its band: the keys on organ, saved to S5 (SAVE + white key 5)
+turn K2 -8
+wait 300
+turn K2 4
+wait 300
+expect msg ORGAN
+down SAVE
+key 7
+up SAVE
+expect saved 4
+# back to karaoke: the song you had
+tap GLO
+wait 600
+turn SELECT 1
+wait 300
+tap SEL
+wait 2500
+expect msg KARAOKE MODE
+expect mode karaoke
+# the saved poem loaded from karaoke: it comes back in SLAMJAM, its keys still on organ
+tap SAVE
+tap SEL
+turn SELECT -8
+wait 300
+turn SELECT 4
+wait 300
+tap SEL
+wait 1500
+expect slot 4
+expect mode slamjam
+turn K2 1
+wait 300
+expect msg VIBES
+# the mode switched while it plays: the song stops, then the mode changes
+tap PLAY
+wait 1000
+tap GLO
+wait 600
+turn SELECT 1
+wait 300
+tap SEL
+wait 2500
+expect playing 0
+expect mode karaoke
+# a song loaded while one plays: it stops, then the other loads (the poem in S5 again, so SLAMJAM again)
+tap PLAY
+wait 1000
+tap SAVE
+tap SEL
+turn SELECT -8
+wait 300
+turn SELECT 4
+wait 300
+tap SEL
+wait 1500
+expect playing 0
+expect slot 4
+expect mode slamjam
+# a poem stays in 4/4: the meter knob says so and does not move
+tap GLO
+wait 600
+turn K4 1
+wait 300
+expect msg A POEM IS 4/4
+expect steps 16

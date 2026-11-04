@@ -1,0 +1,61 @@
+foreign
+# a tonal thing edited is heard, stopped: a sound chosen, a setting turned, a track picked, the key and scale, a note
+# the cursor lands on, a note's pitch
+tap SAVE
+tap SEL
+turn SELECT 1
+tap SEL
+expect page Phrase
+wait 800
+expect heard 0
+# the key: its chord
+tap GLO
+expect page Setup
+wait 300
+expect heard 0
+turn K2 1
+wait 300
+expect heard 1
+wait 800
+turn K3 1
+wait 300
+expect heard 1
+wait 800
+# a track picked, and its sound chosen
+tap HOME
+turn ALGO 1
+wait 300
+expect heard 1
+wait 800
+turn PRESET 1
+wait 300
+expect heard 1
+wait 800
+# a setting of the Voice
+turn ALGO 3
+turn K1 1
+wait 300
+expect heard 1
+wait 800
+# a note written, then the cursor back on it, then its pitch turned
+turn ALGO 1
+tap SEQ
+expect page Phrase
+key 7
+wait 300
+expect heard 1
+wait 1500
+expect heard 0
+turn SELECT -1
+wait 300
+expect heard 1
+wait 1500
+expect heard 0
+turn K3 2
+wait 300
+expect heard 1
+wait 800
+# empty steps are not heard
+turn SELECT 3
+wait 300
+expect heard 0

@@ -16,6 +16,7 @@ uint32_t plat_buttons(void)
 }
 
 uint32_t plat_keys(void) { return (fm1_in.notes | fm1_input_note_edges()) & ((1u << NKEYS) - 1u); }   /* (the same: quick taps count) */
+uint32_t plat_keys_now(void) { return fm1_in.notes & ((1u << NKEYS) - 1u); }
 
 int32_t plat_enc(int role)
 {

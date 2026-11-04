@@ -8,14 +8,19 @@ shot 02-sing-playing
 wait 300
 shot 02b-sing-playing
 expect sung 1
-tap HOME
-expect page Song
-shot 03-song
 tap SEQ
+down HOME
+tap SEQ
+up HOME
+expect page Song
+shot 03-arrange
+down HOME
+tap SEQ
+up HOME
 turn ALGO 3
-shot 04-steps-drums
+shot 04-phrase-drums
 turn ALGO -2
-shot 05-steps-keys
+shot 05-phrase-keys
 tap EDIT
 expect page Sound
 shot 06-sound-keys
@@ -33,9 +38,9 @@ shot 11-mixer
 tap GLO
 shot 12-setup
 tap ARP
-expect page Change
+expect page Arp
 turn ALGO 1
-shot 13-change
+shot 13-arp
 tap PLAY
 expect playing 0
 expect misses 2

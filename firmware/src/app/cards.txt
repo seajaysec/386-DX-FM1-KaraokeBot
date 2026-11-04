@@ -1,0 +1,23 @@
+# The help cards, one per line: ID | title | text. Held on a button for a moment, its card says what the screen is,
+# then "Not shown": the buttons and knobs the screen does not label. A page button's card gets the screen's own
+# knobs and footer buttons after it (ui_pages.h draw_card), so they are never out of step. '|' in the text starts a
+# paragraph. tools/gen_cards.py packs these into build/gen/cards.h (ASCII only). Each card must fit its box:
+# tests/scenarios/perform.sim, "expect cards".
+HOME|HOME: Sing, and shift|The robot and the words. KEYS sing or play.|Hold HOME and press REC: undo; PLAY: redo; a black key: mute; a page's button: its next layer; turn SELECT: tempo.
+SONG|Song: the phrases|Every track's chain of phrases, the selected track's below.|Not shown: SELECT picks a phrase, ALGORITHM the track, PLAY plays from the top.
+DRUMS|Phrase: drum steps|One bar of the drum shown, a white key a step.|Not shown: a black key picks and plays the drum; hold a step and press a black key to put that drum on it; SELECT: bar to bar; SEL: clear the bar. Knobs: VELO, DRUM, BAR, NUDGE (a held step).
+VOICE|Phrase: the Voice|One phrase's notes, the cursor in coral, the line's words below.|Not shown: SELECT moves the cursor; hold a key and turn SELECT to stretch its note; tap a note's key to remove it; SEL: words, delete. Knobs, on a note: BAR, LENGTH, NOTE, NUDGE.
+NOTES|Phrase: notes|One phrase's notes, the cursor in coral.|Not shown: SELECT moves it; hold a key and turn SELECT to stretch its note; tap a note's key to remove it; keys together make a chord; SEL: delete. Knobs, on a note: VELO, LENGTH, NOTE, NUDGE.
+SOUND_VOICE|Sound|How the Voice sounds.|Not shown: KEYS sing "ah"; OCT- and OCT+: his register.
+SOUND|Sound|The track's sound.|Not shown: PRESETS picks it, for good; OCT- and OCT+: its octave; SEL: sound as preset.
+ENV_VOICE|Envelope|The Voice's glide and vibrato.|Not shown: KEYS sing "ah"; OCT- and OCT+: his register.
+ENV|Envelope|The track's sound in time.|Not shown: PRESETS picks the sound; OCT- and OCT+: its octave.
+ARP|Arpeggiator|Keys and Bass play held notes one at a time, the page draws a held chord's pattern. Voice and Drums have none.|Not shown: PRESETS picks the sound.
+FX|Karaoke room|Four banks of knobs: echoes, master, voice, motion.|Not shown: SELECT or HOME+FX: next bank; HOME leaves.
+MIXER|Mixer|Each track's level, then its reverb and delay sends.|Not shown: SELECT or HOME+LFO: next bank.
+SETUP|Setup: the song|The mode (SELECT switches: karaoke or SLAMJAM), the song's size and build.|Not shown: SAVE: the songs. ROOT and SCALE change what the keys play.
+REC|REC|While the song plays, what you play is written into the track. With HOME: undo.
+PLAY|PLAY|Plays the song from the top, or stops it; on Phrase, the phrase you write. With HOME: redo.
+HOME_POETRY|Practice, and shift|The band rehearsing; the poet performs in the room (FX). Each knob a player's style. SEL: new poem or topic; ALGORITHM: your keys' track.|Hold HOME: REC undo, PLAY redo.
+FX_POETRY|SLAMJAM room|The show: the poet performs. Coming in plays, leaving stops. Keys 1-4: wah, echo, scratch, air horn; 9-12: snaps.|Not shown: SELECT: next bank (the fifth: the band); PRESETS: the sound; HOME leaves.
+GATE|-|Each syllable needs a note. KEYS write them at the cursor, or HOME+SEQ to cut the words.

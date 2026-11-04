@@ -70,10 +70,10 @@ export function songFromModel(model) {
   return {
     name: ascii(model.name || 'Song').slice(0, 23), bpm: model.bpm, steps, bars,
     tracks: [
-      {sound: 0, level: 85, mute: 0, reverb: 25, delay: 15},
-      {sound: SOUND_KEYS, level: 70, mute: 0, reverb: 15, delay: 0},
-      {sound: SOUND_BASS, level: 70, mute: 0, reverb: 15, delay: 0},
-      {sound: KIT, level: 70, mute: 0, reverb: 8, delay: 0}],
+      {sound: 0, level: 100, mute: 0, reverb: 25, delay: 15},
+      {sound: SOUND_KEYS, level: 90, mute: 0, reverb: 15, delay: 0},
+      {sound: SOUND_BASS, level: 90, mute: 0, reverb: 15, delay: 0},
+      {sound: KIT, level: 90, mute: 0, reverb: 8, delay: 0}],
     voice: [...VOICE_DEFAULT], fx: [...FX_DEFAULT],
     lines: lines.map(l => ({text: l.text, notes: l.notes})), rows,
     chain: Array.from({length: bars}, (_, b) => (model.backing?.order?.[b] || 0) % PATTERNS),

@@ -1,12 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 // The companion's import, end to end, on every song of the library: the file read, its words and tune
 // found, each syllable checked with the FM-1's own speech engine (the firmware compiled to WebAssembly),
-// the song made, loaded into that engine, and played for 30 s: no missed syllables, and sound.
+// the song made (and made as 1.0 did, then updated: the same bytes), loaded into that engine, and played for
+// 30 s: no missed syllables, and sound.
 //   node tests/import.mjs
 import fs from 'node:fs';
 import {readMidi, alignPronunciation, fitArticulation} from '../web/karaoke.mjs';
 import {planKaraoke} from '../web/onboarding.mjs';
-import {songFromModel, songBytes7, decodeSong7} from '../web/song7.mjs';
+import {songFromModel, songBytes, decodeSong, upgradeSong7} from '../web/song8.mjs';
+import {songFromModel as model7, songBytes7} from '../web/song7.mjs';
 import create from '../web/dsp/engine.mjs';
 const m = await create();
 if (m._browser_init()) throw Error('engine');
@@ -32,8 +34,11 @@ for (const entry of library) {
     for (const part of plan.parts) {
       const aligned = await alignPronunciation(part, t => ask(t, 'scan'), t => ask(t, 'offsets'));
       const checked = await fitArticulation(aligned, t => ask(t, 'minimum'), true, false);
-      const song = songFromModel(checked), bytes = songBytes7(song);
-      decodeSong7(bytes);
+      const song = songFromModel(checked), bytes = songBytes(song);
+      decodeSong(bytes);
+      // the same song made as 1.0 made it, then updated by the companion page: the very same bytes
+      const up = upgradeSong7(songBytes7(model7(checked)));
+      if (up.length !== bytes.length || up.some((b, i) => b !== bytes[i])) throw Error('1.0 song updated differs from a new one');
       m.HEAPU8.set(bytes, m._browser_song());
       if (m._browser_start(0)) throw Error('the engine refused the song');
       let peak = 0;

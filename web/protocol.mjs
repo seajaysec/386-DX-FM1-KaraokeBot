@@ -3,7 +3,7 @@
 // a reply to each request. Numbers are little-endian base 128; bytes travel as two 7-bit halves.
 import {portNames, isUsual} from './ports.mjs?v=1.0.6';
 export const HEADER = [0xf0, 0x7d, 0x4f, 0x4d];
-export const PROTOCOL = 8;
+export const PROTOCOL = 9;
 export const le7 = (n, k = 2) => Array.from({length: k}, (_, i) => Math.floor(n / 2 ** (7 * i)) & 127);
 export const rd7 = (a, at, k = 2) => Array.from({length: k}, (_, i) => (a[at + i] || 0) * 2 ** (7 * i)).reduce((x, y) => x + y, 0);
 const fnv = bytes => { let h = 2166136261; for (const b of bytes) h = Math.imul(h ^ b, 16777619) >>> 0; return h; };

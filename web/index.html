@@ -13,7 +13,7 @@
   <p>A singing robot for the M-VAVE FM-1: karaoke songs in, your own lines sung, four tracks to play.
     <a href="emu/index.html">Try it in the browser</a>, no FM-1 needed.</p>
 </header>
-<div class="video"><iframe src="https://www.youtube-nocookie.com/embed/pwLnpyxqBS4" title="386DX: the trailer" loading="lazy"
+<div class="video"><iframe src="https://www.youtube-nocookie.com/embed/6pK_k7b8pGM" title="386DX: the trailer" loading="lazy"
   allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
 <main id="main">
 
@@ -64,7 +64,7 @@
     <a href="https://github.com/seajaysec/386-DX-ENGINE">386 DX Engine on GitHub</a>, the voice, which this page runs in your browser.</p>
   <p class="note"><a href="https://github.com/seajaysec/386-DX-FM1-KaraokeBot/blob/main/docs/MANUAL.md">Manual</a> ·
     <a href="https://github.com/seajaysec/386-DX-FM1-KaraokeBot/releases">Releases</a> ·
-    <a href="https://youtu.be/pwLnpyxqBS4">Trailer on YouTube</a>.
+    <a href="https://youtu.be/6pK_k7b8pGM">Trailer on YouTube</a>.
     Installing is at your own risk.</p>
 </footer>
 <dialog id="import-dialog" aria-labelledby="import-title">
@@ -74,6 +74,14 @@
       at the note that sings it. The page finds the sung tune and turns the other parts into Keys, Bass
       and Drums. Words in plain English letters; spell numbers out.</p>
     <p><label for="import-file">Song file</label> <input id="import-file" type="file" accept=".kar,.mid,.midi"></p>
+    <div id="import-key" hidden>
+      <p id="import-found"></p>
+      <p><label for="import-root">Key</label> <select id="import-root"></select>
+        <select id="import-scale" aria-label="Scale"></select></p>
+      <p class="note">The keys play in it, and in the karaoke room the black keys play its pentatonic, so what you
+        play over the song fits. Change it here if you know better, or later on the FM-1 (GLO).</p>
+      <p><button value="add">Use this song</button></p>
+    </div>
     <p><button value="cancel" class="quiet">Cancel</button></p>
   </form>
 </dialog>
@@ -87,6 +95,6 @@
     <p><button id="ports-use" value="use">Use this one</button> <button value="cancel" class="quiet">Cancel</button></p>
   </form>
 </dialog>
-<script type="module" src="app.mjs?v=1.0.6"></script>
+<script type="module" src="app.mjs?v=1.1.1"></script>
 </body>
 </html>

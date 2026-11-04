@@ -9,13 +9,16 @@ text-to-speech singing voices played along to MIDI covers of pop songs.
 In so many ways, Alexei was—and still is—ahead of his time, and he’s been an inspiration to many
 who’ve discovered his music in the decades since 386 DX performed.
 
-[![The 386DX trailer](https://img.youtube.com/vi/pwLnpyxqBS4/maxresdefault.jpg)](https://youtu.be/pwLnpyxqBS4)
+[![The 386DX trailer](https://i.ytimg.com/vi/6pK_k7b8pGM/hqdefault.jpg)](https://youtu.be/6pK_k7b8pGM)
 
 386DX turns the M-VAVE FM-1 into a karaoke robot with a band. It sings songs you bring in from
 karaoke and MIDI files, and lines you type on the FM-1 itself, to notes you play on its keys. Its
 face is the voice: the mouth opens with the sound, the eyes ride the pitch, the head shakes with
-the vibrato. Keys, Bass and Drums play along, with a step sequencer, patterns you can shift, pitch
-and weave together, and sixteen effects that punch in under your fingers.
+the vibrato. Keys, Bass and Drums play along: you write each track a phrase at a time and arrange the
+phrases into a song, and sixteen effects punch in under your fingers in the karaoke room.
+
+In SLAMJAM, its second mode, a band and a robot poet make it up as they go: a new poem whenever you ask
+for one, eight bands to play it, and you sitting in on any track, or giving the poet his tune from the keys.
 
 - **The web page: <https://386dx.linecross.ing>** (Chrome or Edge, with the FM-1 plugged in). It
   installs 386DX on your FM-1 and keeps it up to date, puts songs in the FM-1's eight slots (thirteen

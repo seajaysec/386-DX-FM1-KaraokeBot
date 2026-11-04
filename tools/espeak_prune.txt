@@ -1,0 +1,34 @@
+# Phonemes a US-English 386DX never speaks, left out of the speech data (tools/prepare_espeak.py).
+# Each was checked three ways: the dictionary's rules and word list still compile without it (so no rule or word can
+# ask for it), the phoneme programs that stay still compile, and 234,456 words (/usr/share/dict/words and names)
+# never produce it. One name a line; a name may be several characters.
+#X1
+**
+@#
+B
+IR
+J
+J^
+N-
+Q^
+R3
+S;
+X
+Z;
+c
+dZ;
+d[
+e:
+l-
+l.
+l/3
+l^
+m-
+n.
+r"
+r.
+s;
+tS;
+t[
+v#
+z;

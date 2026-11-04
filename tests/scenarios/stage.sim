@@ -1,0 +1,193 @@
+# the stage: wherever Mister Wiggles is out (Sing, the Voice's Sound and Envelope, FX's karaoke room) he stands on the
+# bottom bar in front of the CRT wall; the bars' colours carry the state; the song's words move into the bottom bar
+# while it plays. FX is the karaoke room: white keys punch in, black keys play the track, SELECT turns the knobs' banks
+expect page Sing
+expect track Voice
+wait 300
+shot 01-sing-stopped
+tap PLAY
+wait 1500
+expect playing 1
+shot 02-sing-playing
+# a knob turned while it plays: the strip shows a moment
+turn K1 2
+wait 100
+shot 03-sing-knob
+turn K1 -2
+tap PLAY
+expect playing 0
+# the Voice's Sound page: the stage too
+tap EDIT
+expect page Sound
+shot 04-sound-voice
+# FX: the karaoke room, said on entering and leaving
+tap FX
+expect page Karaoke
+expect msg ENTERING KARAOKE ROOM
+expect button_led FX 1
+expect key_led 0 1
+expect key_led 7 1
+expect key_led 2 0
+wait 1500
+shot 05-room
+# the black keys play the selected track: the Voice sings, ALGORITHM still picks the track
+key 8
+wait 400
+expect sung 1
+shot 06-voice-note
+turn ALGO 1
+expect track Keys
+key 13
+wait 60
+shot 07-keys-note
+wait 600
+turn ALGO -1
+expect track Voice
+# a white key held: its effect, its name in the top bar
+keydown 0
+wait 500
+expect punch 0 1
+shot 08-lo-pass
+keyup 0
+expect punch 0 0
+keydown 2
+wait 300
+shot 09-hi-pass
+keyup 2
+keydown 4
+wait 200
+shot 10-gameboiii
+keyup 4
+keydown 6
+wait 300
+shot 11-ring-mod
+keyup 6
+tap PLAY
+wait 800
+expect playing 1
+keydown 11
+wait 410
+expect punch 6 1
+shot 12-chop-32
+keyup 11
+keydown 12
+wait 300
+expect punch 7 1
+shot 13-chop-64
+keyup 12
+keydown 14
+wait 200
+shot 14-brrr-8
+keyup 14
+keydown 19
+wait 200
+shot 15-brrr-64
+keyup 19
+# build: a snare roll speeding up and a riser on everything but the Voice; let go, the drop
+keydown 21
+wait 2500
+expect punch 12 1
+shot 16-build
+keyup 21
+wait 80
+shot 17-drop
+keydown 23
+wait 200
+shot 18-crush
+keyup 23
+keydown 24
+wait 200
+shot 19-lo-fi
+keyup 24
+keydown 26
+wait 900
+shot 20-tape-off
+keyup 26
+# several held: their pictures mixed, their names piled in the top bar
+keydown 16
+keydown 23
+keydown 24
+wait 400
+expect punch 9 1
+expect punch 13 1
+expect punch 14 1
+shot 21-pile
+keyup 16
+keyup 23
+keyup 24
+tap PLAY
+expect playing 0
+# every knob turned in the room throws its own picture
+turn K1 3
+wait 120
+shot 21b-turn-reverb
+turn K1 -3
+turn K3 3
+wait 200
+shot 21c-turn-delay
+turn K3 -3
+# SELECT turns the banks, the speakers change colour: FILTER (the master) night and day, DRIVE
+turn SELECT 1
+shot 22-bank-master
+turn K4 -40
+wait 400
+shot 23-night
+turn K4 80
+wait 400
+shot 24-day
+turn K4 -40
+turn K1 60
+wait 100
+shot 25a-turn-drive
+wait 1400
+shot 25-drive
+turn K1 -60
+# the voice banks: EDGE fires lasers while he sings, VIBRATO waves the wall
+turn SELECT 1
+turn K3 80
+key 15 400
+shot 26-edge
+turn K3 -80
+turn SELECT 1
+turn K2 80
+wait 300
+shot 27-vibrato
+turn K2 -80
+turn SELECT -3
+# leaving: said, and Sing again
+tap HOME
+expect page Sing
+expect msg EXITING KARAOKE ROOM
+wait 1500
+# FX held alone: its card
+down FX 1800
+shot 28-card
+up FX
+expect page Karaoke
+tap HOME
+# no autosave: a change stays unsaved, SAVE lit, until SAVE
+wait 6000
+expect dirty 1
+expect button_led SAVE 1
+# OCT on Keys: the whole track an octave up, then back
+turn ALGO 1
+tap OCT+
+expect msg OCTAVE +1
+tap OCT-
+turn ALGO -1
+# GLO's list: RESET KNOBS puts every knob back to a new song's, after a question
+tap GLO
+tap SEL
+tap SEL
+tap SEL
+expect msg KNOBS RESET
+wait 1500
+tap HOME
+wait 500
+# the Voice's OCT: its register by name
+tap OCT-
+expect msg BARITONE
+tap OCT+
+tap OCT+
+expect msg ALTO
+tap OCT-

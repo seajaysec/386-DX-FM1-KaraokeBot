@@ -29,6 +29,9 @@
 #define BLOCK 128u
 
 /* ---- the instruments and effects, in memory of their own ---- */
+/* the main loop's calls and the once-a-tick or once-a-block work: small rather than fast (the samples are the same) */
+#define COLD __attribute__((minsize, noinline))
+
 static uint8_t synth_mem[SYNTH_BYTES] __attribute__((aligned(8)));
 static uint8_t kit_mem[DRUMKIT_BYTES] POOL __attribute__((aligned(8)));
 static uint8_t reverb_mem[FXSLOT_BYTES] POOL __attribute__((aligned(8)));
@@ -49,7 +52,7 @@ static struct {
     float acc, lp, fb_lp, time, target, feedback, wow, out_l0, out_l1, out_r0, out_r1, quiet;
 } echo;
 
-static void echo_set(void)
+COLD static void echo_set(void)
 {
     /* the time: a division of the beat (a sixteenth .. two beats), halved while it is over a second */
     static const float BEATS[6] = {0.25f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f};
@@ -119,9 +122,18 @@ volatile int8_t eng_sing_clip = -1;
 volatile uint8_t eng_meter[4];
 volatile uint16_t eng_drum_hits;
 volatile uint32_t eng_punch;
+static volatile uint8_t poetry;       /* SLAMJAM: the brrr keys snap (punch.h has the rest) */
+static volatile uint8_t hush;         /* SLAMJAM outside its room: the band plays, the poet keeps quiet */
+void engine_hush(int on) { hush = (uint8_t)(on != 0); }
+void engine_poetry(int on)
+{
+    poetry = (uint8_t)(on != 0);
+    punch_poetry(on);
+}
+volatile uint8_t eng_duck, eng_gate, eng_reps, eng_look[4];
 
 /* ---- the command queue ---- */
-enum { C_PLAY, C_NOTE, C_OFF, C_SING, C_SING_OFF, C_GUIDE, C_PUNCH, C_TAP, C_ALLOFF, C_TEMPO, C_VOICES };
+enum { C_PLAY, C_NOTE, C_OFF, C_SING, C_SING_OFF, C_GUIDE, C_PUNCH, C_TAP, C_ALLOFF, C_TEMPO, C_VOICES, C_OCTAVE, C_PREVIEW };
 typedef struct { uint8_t op, a, b, c; uint16_t d; uint32_t e; } cmd_t;
 #define QSIZE 64u
 static cmd_t queue[QSIZE];
@@ -171,11 +183,13 @@ static const kit_t KITS[] = {
 };
 #define NKITS (sizeof KITS / sizeof KITS[0])
 static int8_t kit_tune;           /* semitones on every hit (the Drums' TUNE knob) */
+static void build_pick(void);
+static int8_t track_oct[NTRACKS];  /* OCT- / OCT+ on Keys, Bass, Drums: the whole track an octave down or up */
 
 unsigned engine_kits(void) { return NKITS; }
 const char *engine_kit_name(unsigned k) { return KITS[k % NKITS].name; }
 
-void engine_sound(unsigned t)
+COLD void engine_sound(unsigned t)
 {
     if (t == T_VOICE || t >= NTRACKS)
         return;
@@ -219,7 +233,7 @@ void engine_sound(unsigned t)
     }
 }
 
-static void effects_set(void)
+COLD static void effects_set(void)
 {
     const uint8_t *f = song.fx;
     uint8_t rv[4] = {(uint8_t)(f[FX_REVERB_SIZE] * 127u / 100u), 30, (uint8_t)(f[FX_REVERB_TONE] * 127u / 100u), 0};
@@ -267,6 +281,8 @@ static void offs_advance(uint32_t n)
 static struct {
     int8_t clip;                      /* -1: no clip (the hum, or silence) */
     uint8_t live, key, looping, hum, release;
+    uint8_t steered;                  /* this syllable's clip was pronounced at another pitch (a tune given in the
+                                       * SLAMJAM room): repitched as it plays */
     uint16_t note;                    /* scored: the group's first note; its pitch follows the notes */
     uint16_t group_end;
     int16_t row;
@@ -284,7 +300,7 @@ static void sing_stop(void)
         sing.release = 1;
 }
 
-static void sing_start_clip(int clip, unsigned velocity)
+COLD static void sing_start_clip(int clip, unsigned velocity)
 {
     sing.clip = (int8_t)clip;
     vocal_locked = (int8_t)clip;
@@ -298,7 +314,7 @@ static void sing_start_clip(int clip, unsigned velocity)
 }
 
 /* a scored group starts: its first note, the row it belongs to */
-static void sing_scored(unsigned row, unsigned note)
+COLD static void sing_scored(unsigned row, unsigned note)
 {
     int clip = vocal_find((uint16_t)(CLIP_SCORED | note));
     sing.live = 0;
@@ -306,8 +322,8 @@ static void sing_scored(unsigned row, unsigned note)
     sing.group_end = (uint16_t)group_end(&song, note);
     sing.row = (int16_t)row;
     sing.row_at = song.row[row].at;
-    int octave = ((int)song.voice[V_OCTAVE] - 1) * 12;
-    sing.target = (float)((int)song.note[note].pitch + octave);
+    sing.target = (float)((int)song.note[note].pitch + voice_register(&song));
+    sing.steered = clip >= 0 && (int)clips[clip].source_pitch != (int)sing.target;
     if (sing.pitch < 1.0f)
         sing.pitch = sing.target;
     uint32_t ticks = 0;
@@ -334,7 +350,7 @@ static float sing_render_one(void)
         for (unsigned i = sing.note; i < sing.group_end; i++) {
             at += song.note[i].length;
             if (ticks < at || i + 1 == sing.group_end) {
-                sing.target = (float)((int)song.note[i].pitch + ((int)song.voice[V_OCTAVE] - 1) * 12);
+                sing.target = (float)((int)song.note[i].pitch + voice_register(&song));
                 break;
             }
         }
@@ -348,7 +364,7 @@ static float sing_render_one(void)
     if (sing.clip >= 0) {
         const clip_t *c = &clips[sing.clip];
         const int16_t *pcm = clip_arena + c->offset;
-        float rate = sing.looping || sing.live ? 0.25f * fm_exp2f((sing.pitch + vib - (float)c->source_pitch) * (1.0f / 12.0f))
+        float rate = sing.looping || sing.live || sing.steered ? 0.25f * fm_exp2f((sing.pitch + vib - (float)c->source_pitch) * (1.0f / 12.0f))
                                                : 0.25f * fm_exp2f(vib * (1.0f / 12.0f));
         uint32_t i = (uint32_t)sing.pos;
         if (i + 1 >= c->length) {
@@ -394,32 +410,125 @@ static float sing_render_one(void)
     } else
         sing.gain += 0.02f * (1.0f - sing.gain);
     sing.age++;
-    if (sing.left) {
-        if (!--sing.left)
-            sing.release = 1;
+    if (sing.left && !--sing.left) {           /* a guide's or a written note's time is up: as a key let go */
+        sing.release = 1;
+        sing.live = 0;
+        sing.looping = 0;
     }
     return x * sing.gain * sing.velocity;
 }
 
 /* ---- sequencing ---- */
-static void play_tick(unsigned t)
+/* the clock counts sixths of a sixteenth: a step or a sung note nudged (-3..+3 sixths) plays off the grid, and
+ * the arpeggiator's rates (1/8T, 1/16T) land on them. A block is cut only at the sixths something plays on
+ * (sub_mask, and every one while an arpeggio runs): a song with neither renders as it did on sixteenths */
+static uint8_t sub, sub_mask;
+
+/* ---- the arpeggiator (Keys, Bass): the keys held, else the sequenced step's notes while it lasts, one at a
+ * time in the track's order and rate ---- */
+static struct {
+    uint8_t held[8], nheld;               /* the keys down, in the order played */
+    uint8_t seq[4], nseq, vel;
+    uint16_t seq_left, phase, off_in;     /* in sixths: the step's time left, since the run began, to the note's end */
+    uint8_t i, on;                        /* notes played this run; the one sounding (0 none) */
+    uint32_t seed;
+} arp[2];
+
+unsigned arp_order(unsigned type, unsigned n, unsigned i, uint32_t *seed)
 {
-    unsigned steps = song.steps, bar = t / steps, step = t % steps;
-    const pattern_t *pat = &song.pattern[song.chain[bar < song.bars ? bar : 0] % SONG_PATTERNS];
+    if (n < 2)
+        return 0;
+    switch (type) {
+    case ARP_DOWN: return n - 1u - i % n;
+    case ARP_BOUNCE: {
+        unsigned p = i % (2u * n - 2u);
+        return p < n ? p : 2u * n - 2u - p;
+    }
+    case ARP_RANDOM:
+        *seed = *seed * 1664525u + 1013904223u;
+        return (*seed >> 16) % n;
+    default: return i % n;                 /* up, and as played */
+    }
+}
+
+static int arp_on(unsigned b) { return (song.track[b + 1].arp[0] & 15u) != ARP_OFF; }
+COLD static int arp_busy(void)
+{
+    for (unsigned b = 0; b < 2; b++)
+        if (arp[b].on || (arp_on(b) && (arp[b].nheld || arp[b].seq_left)))
+            return 1;
+    return 0;
+}
+
+COLD static void arp_sub(void)
+{
+    static const uint8_t SIX[NARP_RATE] = {24, 12, 8, 6, 4, 3};
+    for (unsigned b = 0; b < 2; b++) {
+        const uint8_t *cfg = song.track[b + 1].arp;
+        typeof(arp[0]) *A = &arp[b];
+        unsigned type = cfg[0] & 15u, oct = (cfg[0] >> 4 & 3u) + 1u, rate = SIX[cfg[1] % NARP_RATE];
+        unsigned gate = cfg[2] ? cfg[2] : 50u, n = A->nheld ? A->nheld : A->seq_left ? A->nseq : 0u;
+        if (A->seq_left)
+            A->seq_left--;
+        if (A->on && (!A->off_in || !--A->off_in || !n || !type)) {
+            synth_note_off(SY, (int)b, (3u << 16) | A->on);
+            A->on = 0;
+        }
+        if (!n || !type || type >= NARP) {
+            A->phase = A->i = 0;
+            continue;
+        }
+        if (A->phase++ % rate)
+            continue;
+        uint8_t src[8];
+        memcpy(src, A->nheld ? A->held : A->seq, n);
+        if (type != ARP_PLAYED)                    /* low to high */
+            for (unsigned x = 1; x < n; x++)
+                for (unsigned y = x; y && src[y - 1] > src[y]; y--) {
+                    uint8_t t = src[y];
+                    src[y] = src[y - 1];
+                    src[y - 1] = t;
+                }
+        unsigned j = arp_order(type, n * oct, A->i++, &A->seed), note = src[j % n] + 12u * (j / n);
+        if (A->on)
+            synth_note_off(SY, (int)b, (3u << 16) | A->on);
+        A->on = (uint8_t)(note > 127u ? 127u : note);
+        synth_note_on(SY, (int)b, A->on, A->vel, 0, (3u << 16) | A->on);
+        A->off_in = (uint16_t)(rate * gate / 100u ? rate * gate / 100u : 1u);
+    }
+}
+
+/* the steps and sung notes of tick t nudged `nudge` sixths: played, or (dry) only counted */
+COLD static int play_backing(unsigned t, int nudge, int dry)
+{
+    unsigned steps = song.steps, step = t % steps;
     uint32_t len = tick_samples();
+    int found = 0;
     for (unsigned b = 0; b < NBACKING; b++) {
-        const step_t *s = &pat->step[b][step];
         unsigned trk = b + 1;
-        if (!s->count || song.track[trk].mute)
+        const step_t *row = lane_steps(&song, trk, t);           /* each track's own chain */
+        if (!row)
+            continue;
+        const step_t *s = &row[step];
+        if (!s->count || song.track[trk].mute || s->nudge != nudge || (found++, dry))
             continue;
         if (trk == T_DRUMS) {
+            int hats = (s->drums & DRUM_ALT) && (t / steps & 4u) == 0;   /* the return of the bar brings the hats */
             for (unsigned lane = 0; lane < DL_NSOUND; lane++)
                 if (s->drums & (1u << lane)) {
-                    drumkit_hit(KIT, (int)lane, s->velocity, kit_tune, 0, 0);
+                    if (hats && lane >= 8)             /* cymbal, open hat, closed hat */
+                        continue;
+                    drumkit_hit(KIT, (int)lane, s->velocity, kit_tune + track_oct[T_DRUMS] * 12, 0, 0);
                     eng_drum_hits |= (uint16_t)(1u << lane);
                     if (lane == 0)
                         punch_pump(s->velocity);
                 }
+        } else if (arp_on(b)) {                  /* the arpeggiator plays them, one at a time, while the step lasts */
+            memcpy(arp[b].seq, s->note, 4);
+            arp[b].nseq = s->count;
+            arp[b].vel = s->velocity;
+            arp[b].seq_left = (uint16_t)(s->length * 6u);
+            arp[b].phase = arp[b].i = 0;
         } else
             for (unsigned k = 0; k < s->count; k++) {
                 uint32_t tag = (1u << 16) | t << 4 | k;   /* a sequenced note: its tick and place */
@@ -427,42 +536,103 @@ static void play_tick(unsigned t)
                 schedule_off(b, tag, len * s->length - len / 8u);
             }
     }
-    /* the voice: a group starting on this sixteenth */
+    return found;
+}
+
+COLD static int play_voice(unsigned t, int nudge, int dry)
+{
+    t = lane_tick(&song, T_VOICE, t);
     int r = row_at(&song, t);
-    eng_sing_row = (int16_t)r;
-    if (r >= 0 && !song.track[T_VOICE].mute && t < row_end(&song, (unsigned)r)) {
-        const row_t *R = &song.row[r];
-        const line_t *L = &song.line[R->line];
-        for (unsigned i = 0; i < L->count; i++) {
-            const note_t *n = &song.note[L->first + i];
-            if (n->tie || R->at + n->at != t)
-                continue;
+    if (r < 0 || song.track[T_VOICE].mute || hush || t >= row_end(&song, (unsigned)r))
+        return 0;
+    const row_t *R = &song.row[r];
+    const line_t *L = &song.line[R->line];
+    for (unsigned i = 0; i < L->count; i++) {
+        const note_t *n = &song.note[L->first + i];
+        if (note_tie(n) || R->at + n->at != t || note_nudge(n) != nudge)
+            continue;
+        if (!dry) {
             if (!sing.live)
                 sing_scored((unsigned)r, L->first + i);
             eng_sing_note = (int16_t)(L->first + i);
-            break;
         }
-    } else if (r < 0 && !sing.live)
+        return 1;
+    }
+    return 0;
+}
+
+/* tick t's sixth u: t's steps and sung notes nudged u later, and the next tick's nudged 6 - u earlier */
+static int play_sixth(unsigned t, unsigned next, unsigned u, int dry)
+{
+    int n = 0;
+    if (u <= 3)
+        n += play_backing(t, (int)u, dry) + play_voice(t, (int)u, dry);
+    if (u >= 3)
+        n += play_backing(next, (int)u - 6, dry) + play_voice(next, (int)u - 6, dry);
+    return n;
+}
+
+/* SLAMJAM's snaps (the brrr keys): the room snapping its fingers (punch.c makes the snap) on every beat, every
+ * eighth, every sixteenth or every thirty-second, the backbeat harder; half: the thirty-second between sixteenths */
+static void snap(unsigned t, int half)
+{
+    uint32_t h = poetry ? eng_punch >> PU_STUTTER8 & 15u : 0u;
+    if (!h) {
+        punch_snap(0);                            /* (none held: they rise from the bottom next time) */
+        return;
+    }
+    unsigned n = h & 8u ? 3u : h & 4u ? 2u : h & 2u ? 1u : 0u;
+    if (half ? n < 3u : t % (4u >> (n > 2u ? 2u : n)) != 0u)
+        return;
+    unsigned vel = t % 8u == 4u && !half ? 127u : t % 4u == 0u && !half ? 116u : 100u;
+    punch_snap(vel);
+}
+
+COLD static void play_tick(unsigned t)
+{
+    unsigned next = t + 1u < song_ticks(&song) ? t + 1u : 0u;
+    if (!sub) {                                   /* the sixths of this tick that something nudged plays on */
+        sub_mask = 0;
+        for (unsigned u = 1; u < 6; u++)
+            if (play_sixth(t, next, u, 1))
+                sub_mask |= (uint8_t)(1u << u);
+    }
+    play_sixth(t, next, sub, 0);
+    if (sub) {
+        if (sub == 3)
+            snap(t, 1);
+        return;
+    }
+    snap(t, 0);
+    /* the voice's row now (its chain plays round again) */
+    unsigned vt = lane_tick(&song, T_VOICE, t);
+    int r = row_at(&song, vt);
+    eng_sing_row = (int16_t)r;
+    if (r < 0 && !sing.live)
         eng_sing_note = -1;
+    if (hush && !sing.live && sing.clip >= 0)
+        sing_stop();                              /* (out of the room: his line stops there) */
     /* a row that ends while its last group still sings is cut there */
-    if (!sing.live && sing.clip >= 0 && sing.row >= 0 && (r != sing.row || t >= row_end(&song, (unsigned)sing.row)))
+    if (!sing.live && sing.clip >= 0 && sing.row >= 0 && (r != sing.row || vt >= row_end(&song, (unsigned)sing.row)))
         sing_stop();
 }
 
-static void transport_stop(void)
+COLD static void transport_stop(void)
 {
     eng_playing = 0;
     started = 0;
     synth_all_off(SY, -1);
     for (unsigned i = 0; i < sizeof offs / sizeof offs[0]; i++)
         offs[i].on = 0;
+    arp[0].seq_left = arp[1].seq_left = 0;
+    arp[0].on = arp[1].on = 0;
     if (!sing.live)
         sing_stop();
     eng_sing_row = -1;
     eng_sing_note = -1;
 }
 
-static void commands(void)
+COLD static void commands(void)
 {
     unsigned n = 0;
     while (qr != qw && n++ < QSIZE) {
@@ -488,17 +658,31 @@ static void commands(void)
         case C_NOTE:
             if (c.a == T_DRUMS) {
                 if (c.b < DL_NSOUND) {
-                    drumkit_hit(KIT, c.b, c.c, kit_tune, 0, 0);
+                    drumkit_hit(KIT, c.b, c.c, kit_tune + track_oct[T_DRUMS] * 12, 0, 0);
                     eng_drum_hits |= (uint16_t)(1u << c.b);
                     if (c.b == 0)
                         punch_pump(c.c);
                 }
+            } else if ((c.a == T_KEYS || c.a == T_BASS) && arp_on(c.a - 1u)) {
+                typeof(arp[0]) *A = &arp[c.a - 1u];
+                if (!A->nheld)
+                    A->phase = A->i = 0;         /* the first key down starts the run */
+                if (A->nheld < 8 && !memchr(A->held, c.b, A->nheld))
+                    A->held[A->nheld++] = c.b;
+                A->vel = c.c;
             } else if (c.a == T_KEYS || c.a == T_BASS)
                 synth_note_on(SY, c.a - 1, c.b, c.c, 0, (2u << 16) | c.b);
             break;
         case C_OFF:
-            if (c.a == T_KEYS || c.a == T_BASS)
+            if (c.a == T_KEYS || c.a == T_BASS) {
+                typeof(arp[0]) *A = &arp[c.a - 1u];
+                uint8_t *h = memchr(A->held, c.b, A->nheld);
+                if (h) {
+                    memmove(h, h + 1, (size_t)(A->held + A->nheld - h - 1));
+                    A->nheld--;
+                }
                 synth_note_off(SY, c.a - 1, (2u << 16) | c.b);
+            }
             break;
         case C_ALLOFF:
             if (c.a == T_DRUMS) {
@@ -511,10 +695,9 @@ static void commands(void)
             int clip = vocal_find(c.d);
             sing.live = 1;
             sing.key = c.b;
-            sing.target = (float)c.b;
+            sing.target = (float)((int)c.b + voice_register(&song));      /* the keys sing in QUALITY's register */
             if (sing.pitch < 1.0f || (sing.clip < 0 && !sing.hum))
                 sing.pitch = sing.target;
-            sing.left = 0;
             sing.row = -1;
             if (clip >= 0)
                 sing_start_clip(clip, c.c);
@@ -528,8 +711,17 @@ static void commands(void)
                 sing.age = 0;
                 sing.velocity = (float)c.c / 127.0f;
             }
+            sing.left = c.e;                   /* a note written: heard for its length (0: while the key is down) */
             break;
         }
+        case C_PREVIEW:                        /* a note written on Keys, Bass or Drums, heard for its length */
+            if (c.a == T_DRUMS)
+                drumkit_hit(KIT, c.b, c.c, kit_tune + track_oct[T_DRUMS] * 12, 0, 0);
+            else {
+                synth_note_on(SY, c.a - 1, c.b, c.c, 0, (4u << 16) | c.b);
+                schedule_off(c.a - 1u, (4u << 16) | c.b, c.e);
+            }
+            break;
         case C_SING_OFF:
             if (sing.live && sing.key == c.b) {
                 sing.live = 0;
@@ -551,7 +743,12 @@ static void commands(void)
             sing.target = sing.pitch = (float)c.b;
             sing.left = c.e;
             break;
+        case C_OCTAVE:
+            track_oct[c.a % NTRACKS] = (int8_t)((int)c.b - 8);
+            break;
         case C_PUNCH:
+            if (c.b && c.a == PU_BUILD && !(eng_punch >> PU_BUILD & 1u))
+                build_pick();
             if (c.b)
                 eng_punch |= 1u << c.a;
             else
@@ -570,6 +767,69 @@ static void commands(void)
 
 /* ---- the block ---- */
 static float level_cur[NTRACKS], vox_peak;
+
+/* build, held: a riser on 1 to 4 of the tracks, picked at random at each press (eng_build_mask, a bit a track):
+ * Drums a snare roll that speeds up every two beats (eighths, sixteenths, 32nds, 64ths) and grows louder, and a
+ * high-pass sweeping up from 30 Hz to about 2 kHz over two bars, swelling 3 dB; Keys and Bass rising an octave with
+ * their filters opening; the Voice the high-pass's sweep. Let go, the riser falls away in about 50 ms. */
+static struct {
+    uint32_t held, next, seed;        /* samples held; samples to the next hit */
+    float rise, k, g, hp[3];          /* 0..1; the high-pass's coefficient and swell; its states (drums L, R; voice) */
+} build;
+volatile uint8_t eng_build, eng_build_mask;
+
+COLD static void build_pick(void)
+{
+    build.seed = build.seed * 1664525u + 1013904223u + eng_tick * 2654435761u;   /* the sixteenth pressed on decides */
+    eng_build_mask = (uint8_t)(1u + (build.seed >> 16) % 15u);
+}
+
+COLD static void build_roll(uint32_t n)
+{
+    uint32_t beat = RATE * 60u / song.bpm;
+    int held = eng_punch >> PU_BUILD & 1u;
+    if (!held)
+        build.held = build.next = 0;
+    if (held && (eng_build_mask >> T_DRUMS & 1u) && build.next <= n) {
+        unsigned k = build.held / (2u * beat);
+        unsigned vel = 50u + (build.held < 8u * beat ? build.held * 77u / (8u * beat) : 77u);
+        drumkit_hit(KIT, 1, (int)vel, kit_tune + track_oct[T_DRUMS] * 12, 0, 0);      /* the snare */
+        eng_drum_hits |= 2u;
+        build.next += beat >> (1u + (k > 3u ? 3u : k));
+    }
+    if (held) {
+        build.next = build.next > n ? build.next - n : 0;
+        build.held += n;
+    }
+    /* the riser: up while held, away in ~50 ms after */
+    float want = held ? (float)build.held / (float)(8u * beat) : 0.0f;
+    want = want > 1.0f ? 1.0f : want;
+    build.rise += (want > build.rise ? 1.0f : 0.25f) * (want - build.rise);
+    if (build.rise < 0.001f) {
+        build.rise = 0.0f;
+        build.hp[0] = build.hp[1] = build.hp[2] = 0.0f;
+    }
+    build.k = 1.0f - fm_expf(-FM_TWO_PI * 30.0f * fm_exp2f(build.rise * 6.0f) / (float)RATE);
+    build.g = 1.0f + 0.41f * build.rise;
+    /* Keys and Bass: the octave, and the riser's climb and opening filter */
+    for (unsigned t = T_KEYS; t <= T_BASS; t++) {
+        perf_t *p = synth_perf(SY, (int)t - 1);
+        int on = eng_build_mask >> t & 1u;
+        p->pitch_c = (int16_t)(track_oct[t] * 1200 + (on ? (int)(build.rise * 1200.0f) : 0));
+        p->cut = (int16_t)(on ? (int)(build.rise * 90.0f) : 0);
+    }
+}
+
+/* the riser's high-pass on one buffer, its state st */
+static void build_hp(float *x, float *st, uint32_t n)
+{
+    float s = *st;
+    for (uint32_t i = 0; i < n; i++) {
+        s += build.k * (x[i] - s);
+        x[i] = (x[i] - s) * build.g;
+    }
+    *st = fm_flush(s);
+}
 
 static void render_part(uint32_t n)
 {
@@ -594,6 +854,7 @@ static void render_part(uint32_t n)
     }
     par[0][TP_LEVEL] = (uint8_t)(g[T_KEYS] * 64.0f);
     par[1][TP_LEVEL] = (uint8_t)(g[T_BASS] * 110.0f);
+    build_roll(n);
     synth_prepare(SY, n);
     synth_render(SY, 0, NVOICE, mel_l, mel_r, send_dly, send_rev, send_tape, n);
     drumkit_render(KIT, drum_l, drum_r, send_dly, send_rev, send_tape, n);
@@ -602,6 +863,11 @@ static void render_part(uint32_t n)
         drum_l[i] *= dg;
         drum_r[i] *= dg;
     }
+    if (build.rise > 0.0f && (eng_build_mask >> T_DRUMS & 1u)) {
+        build_hp(drum_l, &build.hp[0], n);
+        build_hp(drum_r, &build.hp[1], n);
+    }
+    int vox_rise = build.rise > 0.0f && (eng_build_mask >> T_VOICE & 1u);
 
     /* the voice: mono, in the middle, with its own sends */
     float vg = g[T_VOICE] * ((float)song.voice[V_LEVEL] * 0.01f) * 0.9f;
@@ -611,6 +877,10 @@ static void render_part(uint32_t n)
     float peak = 0.0f, bright = 0.0f;
     for (uint32_t i = 0; i < n; i++) {
         float x = sing_render_one() * vg;
+        if (vox_rise) {                                 /* build on the Voice: the riser's sweep */
+            build.hp[2] += build.k * (x - build.hp[2]);
+            x = (x - build.hp[2]) * build.g;
+        }
         vib_phase += rate * (FM_TWO_PI / (float)RATE);
         if (vib_phase >= FM_TWO_PI)
             vib_phase -= FM_TWO_PI;
@@ -646,14 +916,19 @@ void engine_render(int32_t *out, uint32_t frames)
         uint32_t n = frames - done;
         if (n > BLOCK)
             n = BLOCK;
-        if (eng_playing) {
-            uint32_t inc = song.bpm * 4u, whole = RATE * 60u;
-            if (!started) {
-                play_tick(next_tick);
-                eng_tick = next_tick;
-                started = 1;
-            }
-            uint32_t until = (whole - clock_phase + inc - 1u) / inc;
+        uint32_t inc = song.bpm * 24u, whole = RATE * 60u;     /* a sixth of a sixteenth (it runs stopped too: the arp) */
+        if (eng_playing && !started) {
+            sub = 0;
+            play_tick(next_tick);
+            eng_tick = next_tick;
+            started = 1;
+        }
+        int busy = arp_busy();
+        if (eng_playing || busy) {               /* the block cut at the next sixth that matters */
+            unsigned k = 1;
+            while (!busy && sub + k < 6 && !(sub_mask >> (sub + k) & 1u))
+                k++;
+            uint32_t until = (k * whole - clock_phase + inc - 1u) / inc;
             if (n > until)
                 n = until;
             if (!n)
@@ -668,16 +943,18 @@ void engine_render(int32_t *out, uint32_t frames)
             out[2u * (done + i) + 1u] = (int32_t)(r * 8388607.0f);
         }
         offs_advance(n);
-        if (eng_playing) {
-            clock_phase += n * song.bpm * 4u;
-            if (clock_phase >= RATE * 60u) {
-                clock_phase -= RATE * 60u;
-                next_tick++;
-                if (next_tick >= song_ticks(&song))
+        clock_phase += n * inc;
+        while (clock_phase >= whole) {
+            clock_phase -= whole;
+            if (++sub == 6)
+                sub = 0;
+            if (eng_playing) {
+                if (!sub && ++next_tick >= song_ticks(&song))
                     next_tick = 0;               /* the song goes round */
                 eng_tick = next_tick;
                 play_tick(next_tick);
             }
+            arp_sub();
         }
         done += n;
     }
@@ -694,10 +971,15 @@ void engine_render(int32_t *out, uint32_t frames)
         eng_meter[t] = (uint8_t)(v * 127.0f > 127.0f ? 127.0f : v * 127.0f);
     }
     eng_meter[T_VOICE] = eng_sing_level;
+    eng_duck = (uint8_t)(punch_duck() * 127.0f);
+    eng_gate = (uint8_t)(punch_gate() * 127.0f);
+    eng_reps = (uint8_t)punch_reps();
+    punch_look((uint8_t *)eng_look);
+    eng_build = (uint8_t)(build.rise * 127.0f);
 }
 
 /* ---- the main loop's calls ---- */
-void engine_init(void)
+COLD void engine_init(void)
 {
     qr = qw = 0;
     memset(par, 0, sizeof par);
@@ -713,7 +995,7 @@ void engine_init(void)
     eng_playing = 0;
 }
 
-void engine_song(void)
+COLD void engine_song(void)
 {
     for (unsigned t = 1; t < NTRACKS; t++)
         engine_sound(t);
@@ -753,6 +1035,13 @@ void engine_sing(unsigned note, unsigned vel, uint16_t id)
     send(&c);
 }
 
+void engine_preview(unsigned t, unsigned note, unsigned vel, uint16_t id, unsigned ms)
+{
+    cmd_t c = {t == T_VOICE ? C_SING : C_PREVIEW, (uint8_t)t, (uint8_t)note, (uint8_t)(vel ? vel : 1), id, RATE / 1000u * ms};
+    send(&c);
+}
+
+
 void engine_sing_off(unsigned note)
 {
     cmd_t c = {C_SING_OFF, 0, (uint8_t)note, 0, 0, 0};
@@ -762,6 +1051,12 @@ void engine_sing_off(unsigned note)
 void engine_guide(unsigned note, unsigned ms)
 {
     cmd_t c = {C_GUIDE, 0, (uint8_t)note, 0, 0, RATE / 1000u * ms};
+    send(&c);
+}
+
+void engine_octave(unsigned track, int octave)
+{
+    cmd_t c = {C_OCTAVE, (uint8_t)track, (uint8_t)(octave + 8), 0, 0, 0};
     send(&c);
 }
 
@@ -775,7 +1070,7 @@ void engine_punch(unsigned k, int on)
  * the synth plays with fewer voices (a chord's oldest notes end sooner) rather than let a block run
  * late and drop out; back to all of them after three seconds under 60 %. Main loop, every pass. */
 volatile uint8_t eng_guard;
-void engine_guard(unsigned load_pct, uint32_t now_ms)
+COLD void engine_guard(unsigned load_pct, uint32_t now_ms)
 {
     static uint32_t calm_since;
     cmd_t c = {C_VOICES, 0, 0, 0, 0, 0};

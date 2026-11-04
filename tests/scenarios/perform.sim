@@ -1,12 +1,11 @@
-# steps, recording, punch-in, mutes, undo, tempo, help cards, changing a pattern, saving and loading
-# on a new song (4/4, 100 BPM): GLO's list, NEW SONG, yes
-tap GLO
+# steps, the cursor, punch-in, mutes, undo, tempo, help cards, the arpeggiator, saving and loading
+# on a new song (4/4, 100 BPM): SAVE's list, LOAD, an empty slot
+tap SAVE
 tap SEL
-turn SELECT 2
-tap SEL
+turn SELECT 1
 tap SEL
 expect rows 0
-tap SEQ
+expect page Phrase
 turn ALGO 3
 expect track Drums
 # black key 3 (low tom... lane 2): white keys toggle its steps
@@ -18,83 +17,91 @@ shot 01-drum-steps
 tap PLAY
 wait 2500
 tap PLAY
-# keys: REC writes the cursor step, a chord when keys go down together
+# keys: the keys write at the cursor, a chord when keys go down together; the cursor moves on a step
 turn ALGO -2
 expect track Keys
-tap REC
-expect msg WRITING STEPS
 keydown 7
 keydown 11
 keydown 14
 keyup 7
 keyup 11
 keyup 14
+expect step Keys 1 60
 key 9
-tap OCT+
-key 12
-tap REC
-shot 02-keys-steps
-# the white keys are the steps: SEQ held + keys sets the notes they write (D4 F4 A4), then step 16 gets them
-down SEQ
-keydown 9
+expect step Keys 2 62
+# a key held and SELECT turned: its note stretches with the cursor
 keydown 12
-keydown 16
-keyup 9
+turn SELECT 3
 keyup 12
-keyup 16
-up SEQ
-key 26
-key 26
-key 26
-expect step Keys 16 62
-shot 03-keys-white
-# undo the last writes and redo them
+expect step Keys 3 65
+shot 02-keys-cursor
+# the knobs work on the note under the cursor: its NOTE, its NUDGE
+turn SELECT -4
+turn K3 2
+expect step Keys 3 67
+turn K4 2
+expect nudge Keys 3 2
+# a tap on a note at the cursor takes it away (the chord keeps the rest)
+turn SELECT -2
+key 7
+expect step Keys 1 67
+# undo it, redo it
 down HOME
 tap REC
 up HOME
 expect msg UNDO
-expect step Keys 16 0
+expect step Keys 1 60
 down HOME
 tap PLAY
 up HOME
 expect msg REDO
-expect step Keys 16 62
+expect step Keys 1 67
 # tempo with HOME held and SELECT
 down HOME
 turn SELECT 8
 up HOME
 expect bpm 108
-# Change (ARP): SHIFT turns the keys one step later, TRANSPOSE moves them up
+# HOME + SEQ: the song, its phrases; and again: back into the phrase
+down HOME
+tap SEQ
+up HOME
+expect page Song
+down HOME
+tap SEQ
+up HOME
+expect page Phrase
+# Arp (ARP): Keys play the keys held one at a time, up, an eighth each
 tap ARP
-expect page Change
+expect page Arp
 turn K1 1
-expect step Keys 1 62
-expect step Keys 2 60
-turn K2 2
-expect step Keys 2 62
-shot 04-change
-# WEAVE: the drums of another pattern into this bar's
+turn K2 1
+shot 04-arp
+keydown 7
+keydown 11
+keydown 14
+wait 1500
+keyup 7
+keyup 11
+keyup 14
+turn K1 -1
 turn ALGO 2
 expect track Drums
-tap SEL
-tap SEL
-expect msg WOVE P2 IN
 # the drums' envelope: FUNK pushes the hits late
 tap ENV
 expect page Envelope
 turn K1 20
 shot 05-drum-envelope
-# punch-in on the Effects page, while playing
+# punch-in in the karaoke room, while playing
 tap FX
 tap PLAY
 wait 1200
-keydown 9
+keydown 14
 wait 600
 shot 06-punch-stutter
-keyup 9
-keydown 7
+keyup 14
+keydown 23
 wait 500
-keyup 7
+keyup 23
 tap PLAY
 # mute the drums from anywhere: HOME + black key 4
 tap HOME
@@ -102,6 +109,8 @@ down HOME
 key 8
 up HOME
 expect msg muted
+# every help card fits its box, on each screen it is held on
+expect cards 1
 # a help card: SEQ held alone
 down SEQ 1200
 shot 07-card
@@ -111,8 +120,7 @@ down SAVE
 key 4
 up SAVE
 expect saved 2
-tap GLO
-tap SEL
+tap SAVE
 tap SEL
 turn SELECT -1
 shot 08-setup-list
@@ -120,13 +128,18 @@ tap SEL
 expect slot 1
 expect page Sing
 shot 09-loaded
-# the effects keys: the first of each row of four is lit (white keys 1, 5, 9, 13 = keys 0, 7, 14, 21), the others dark
+# the effects keys: the first of each family of four is lit (white keys 1, 5, 9, 13 = keys 0, 7, 14, 21), the
+# others dark
 tap FX
 expect key_led 0 1
 expect key_led 2 0
 expect key_led 4 0
+expect key_led 7 1
+expect key_led 12 0
 expect key_led 14 1
+expect key_led 19 0
 expect key_led 21 1
+expect key_led 24 0
 expect key_led 9 0
 # a punch-in key held: lit; let go: it blinks; two held together: both blink after
 keydown 9

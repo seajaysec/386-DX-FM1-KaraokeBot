@@ -146,6 +146,7 @@ static int es_format(char *out,size_t cap,const char *fmt,va_list args)
 int es_sprintf(char *out,const char *fmt,...){va_list a;va_start(a,fmt);int n=es_format(out,(size_t)-1,fmt,a);va_end(a);return n;}
 int es_snprintf(char *out,size_t cap,const char *fmt,...){va_list a;va_start(a,fmt);int n=es_format(out,cap,fmt,a);va_end(a);return n;}
 static int es_space(char c){return c==' ' || c=='\t' || c=='\r' || c=='\n';}
+long es_strtol(const char *,char **,int);
 int es_sscanf(const char *s,const char *fmt,...)
 {
     int n=0;va_list a;va_start(a,fmt);
@@ -156,10 +157,98 @@ int es_sscanf(const char *s,const char *fmt,...)
         if(*fmt=='s'){char *p=va_arg(a,char *);while(es_space(*s))s++;if(!*s)break;while(*s && !es_space(*s))*p++=*s++;*p=0;n++;}
         else if(*fmt=='c'){if(!*s)break;*va_arg(a,char *)=*s++;n++;}
         else if(*fmt=='d' || *fmt=='x'){
-            char *end;long v=strtol(s,&end,*fmt=='x'?16:10);if(end==s)break;*va_arg(a,int *)=(int)v;s=end;n++;
+            char *end;long v=es_strtol(s,&end,*fmt=='x'?16:10);if(end==s)break;*va_arg(a,int *)=(int)v;s=end;n++;
         }else break;
         fmt++;
     }
     va_end(a);return n;
 }
+/* strtol, atoi and strtok without the C library's per-thread state (its 1 KB of .data) */
+long es_strtol(const char *s,char **end,int base)
+{
+    const char *p=s;
+    unsigned long v=0;
+    int neg=0,any=0,d;
+    while(*p==' '||(*p>='\t'&&*p<='\r'))p++;
+    if(*p=='+'||*p=='-')neg=*p++=='-';
+    if(base==16&&p[0]=='0'&&(p[1]=='x'||p[1]=='X'))p+=2;
+    for(;;p++){
+        d=*p>='0'&&*p<='9'?*p-'0':*p>='a'&&*p<='z'?*p-'a'+10:*p>='A'&&*p<='Z'?*p-'A'+10:99;
+        if(d>=base)break;
+        any=1;
+        v=v>(0x7fffffffUL-(unsigned)d)/(unsigned)base?0x80000000UL:v*(unsigned)base+(unsigned)d;
+    }
+    if(end)*end=(char *)(any?p:s);
+    if(v>=0x80000000UL)return neg?(long)(-0x7fffffffL-1):0x7fffffffL;
+    return neg?-(long)v:(long)v;
+}
+int es_atoi(const char *s){return (int)es_strtol(s,0,10);}
+char *es_strtok(char *s,const char *sep)
+{
+    static char *next;
+    char *t;
+    if(!s)s=next;
+    if(!s)return 0;
+    while(*s&&strchr(sep,*s))s++;
+    if(!*s){next=0;return 0;}
+    t=s;
+    while(*s&&!strchr(sep,*s))s++;
+    if(*s)*s++=0;
+    next=s;
+    return t;
+}
+/* qsort for the library's short voice lists: an insertion sort */
+void es_qsort(void *base,size_t n,size_t size,int (*cmp)(const void *,const void *))
+{
+    unsigned char *b=base;
+    size_t i,j,k;
+    for(i=1;i<n;i++)
+        for(j=i;j>0&&cmp(b+(j-1)*size,b+j*size)>0;j--)
+            for(k=0;k<size;k++){unsigned char t=b[(j-1)*size+k];b[(j-1)*size+k]=b[j*size+k];b[j*size+k]=t;}
+}
 char *es_strdup(const char *s){size_t n=strlen(s)+1;char *p=es_malloc(n);if(p)memcpy(p,s,n);return p;}
+
+/* sin and cos for the speech library's filter set-up and flutter: the argument brought to within pi/4 of a
+ * quarter turn (pi/2 in two parts, exact while the turn count stays under 2^20), then the classic minimax
+ * kernels. Within an ulp or two of the C library's, in a few hundred bytes instead of its 4 KB. */
+static double es_kernel(double r,int odd)
+{
+    double z=r*r;
+    if(odd)
+        return r+r*z*(-1.66666666666666324348e-01+z*(8.33333333332248946124e-03+z*(-1.98412698298579493134e-04
+               +z*(2.75573137070700676789e-06+z*(-2.50507602534068634195e-08+z*1.58969099521155010221e-10)))));
+    return 1.0-0.5*z+z*z*(4.16666666666666019037e-02+z*(-1.38888888888741095749e-03+z*(2.48015872894767294178e-05
+           +z*(-2.75573143513906633035e-07+z*(2.08757232129817482790e-09-z*1.13596475577881948265e-11)))));
+}
+static double es_turn(double x,int q)          /* q: 0 sin, 1 cos */
+{
+    double t=x*6.36619772367581382433e-01;
+    int k=(int)(t>=0.0?t+0.5:t-0.5);
+    double r=(x-k*1.57079632673412561417e+00)-k*6.07710050650619224932e-11;
+    k+=q;
+    double v=es_kernel(r,!(k&1));
+    return k&2?-v:v;
+}
+double es_sin(double x){return es_turn(x,0);}
+double es_cos(double x){return es_turn(x,1);}
+/* exp, the same way as the C library's: x = k ln2 + r, a rational kernel for e^r, then k added to the
+ * exponent's bits */
+double es_exp(double x)
+{
+    union {double d;uint64_t u;} y;
+    int k;
+    double hi,lo,r,t,c;
+    if(x<-700.0)return 0.0;
+    if(x>700.0)x=700.0;
+    k=x>-0.34657359027997264 && x<0.34657359027997264 ? 0 : (int)(x*1.44269504088896338700e+00+(x<0.0?-0.5:0.5));
+    hi=x-k*6.93147180369123816490e-01;
+    lo=k*1.90821492927058770002e-10;
+    r=hi-lo;
+    t=r*r;
+    c=r-t*(1.66666666666666019037e-01+t*(-2.77777777770155933842e-03+t*(6.61375632143793436117e-05
+      +t*(-1.65339022054652515390e-06+t*4.13813679705723846039e-08))));
+    if(!k)return 1.0-((r*c)/(c-2.0)-r);
+    y.d=1.0-((lo-(r*c)/(2.0-c))-hi);
+    y.u+=(uint64_t)(int64_t)k<<52;
+    return y.d;
+}

@@ -5,7 +5,7 @@
 // against the FM-1's own speech engine; prints the 386DX song bytes as base64 for tools/gen_songs.py.
 //   node tools/demo_song.mjs
 import fs from 'node:fs';
-import {songFromModel, songBytes7} from '../web/song7.mjs';
+import {songFromModel, songBytes} from '../web/song8.mjs';
 import create from '../web/dsp/engine.mjs';
 
 const src = JSON.parse(fs.readFileSync(new URL('../firmware/assets/demo_songs.json', import.meta.url)))
@@ -45,5 +45,5 @@ const patterns = src.patterns.map(chords => {
 const bars = src.order.length;
 const song = songFromModel({name: 'Greensleeves', bpm: src.bpm, steps: src.steps, bars, notes, lines,
   backing: {order: src.order, patterns}});
-process.stdout.write(JSON.stringify({name: song.name, bytes: Buffer.from(songBytes7(song)).toString('base64'),
+process.stdout.write(JSON.stringify({name: song.name, bytes: Buffer.from(songBytes(song)).toString('base64'),
   summary: `${bars} bars, ${song.lines.length} lines, ${song.rows.length} rows, ${notes.length} notes`}));

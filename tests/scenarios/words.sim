@@ -1,0 +1,21 @@
+foreign
+# words before notes: on a new song's empty Voice phrase, HOME+SEQ (the words layer) starts the line; the notes written
+# after join it and take its syllables
+tap SAVE
+tap SEL
+turn SELECT 1
+tap SEL
+expect page Phrase
+down HOME
+tap SEQ
+up HOME
+type la la la
+tap SEL
+expect msg KEPT
+expect rows 1
+key 7
+key 9
+key 11
+expect notes 3
+expect rows 1
+expect line_text 0 la la la

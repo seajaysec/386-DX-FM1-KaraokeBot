@@ -12,40 +12,90 @@
 static int flashing(void) { return plat_ms() - ui.flash_at < 500u; }
 
 /* ---- the header ---- */
-static void draw_header(void)
+/* its colour says the state: plum stopped, teal playing, red recording; a message's colour says what
+ * kind it is (done green, refused red, undo amber); the punch-ins held pile their names on magenta */
+__attribute__((noinline)) static void draw_header(void)
 {
-    g_rect(0, 0, 240, 22, K_PAPER);
-    g_rect(0, 22, 240, 1, K_RULE);
-    if (plat_ms() < ui.msg_until && ui.msg[0][0]) {
-        uint16_t bg = ui.msg_kind == M_NO ? K_INK : ui.msg_kind == M_UNDO ? K_PANEL : K_PAPER;
-        uint16_t fg = ui.msg_kind == M_NO ? K_PAPER : K_INK;
-        g_round(2, 1, 236, 20, 6, bg);
+    if (!g_visible(0, 23))
+        return;                               /* (each band draws the whole scene: only the top band holds this) */
+    int msg = plat_ms() < ui.msg_until && ui.msg[0][0];
+    uint16_t bg = eng_playing ? (ui.rec ? RGB(200, 46, 60) : kp[KC_HEAD_PLAY]) : kp[KC_HEAD];
+    if (msg)
+        bg = ui.msg_kind == M_NO ? RGB(170, 40, 50) : ui.msg_kind == M_DONE ? RGB(30, 130, 90)
+                 : ui.msg_kind == M_UNDO ? RGB(210, 140, 40) : RGB(130, 70, 190);
+    if (!msg && eng_punch)
+        bg = RGB(210, 50, 150);
+    g_rect(0, 0, 240, 23, bg);
+    g_rect(0, 20, 240, 3, K_TRACK[ui.track]);     /* its lower edge: the selected track's colour, on every page */
+    if (msg) {
+        uint16_t fg = K_WHITE;
         int x = 8;
         if (ui.msg_kind == M_NO) {
             g_disc(14, 11, 7, K_CORAL);
             g_center(7, 1, 14, &FONT_XS, "!", K_WHITE);
             x = 26;
         } else if (ui.msg_kind == M_DONE) {
-            g_line(9, 11, 12, 15, 3, K_TEAL);
-            g_line(12, 15, 19, 6, 3, K_TEAL);
+            g_line(9, 11, 12, 15, 3, K_WHITE);
+            g_line(12, 15, 19, 6, 3, K_WHITE);
             x = 26;
         }
         int end = x + g_tw(&FONT_S, ui.msg[0]);
         g_text(x, 0, 230 - x, &FONT_S, ui.msg[0], fg);
         if (ui.msg[1][0])
-            g_text(end + 8, 3, 232 - end - 8, &FONT_XS, ui.msg[1], ui.msg_kind == M_NO ? K_FAINT : K_DIM);
+            g_text(end + 8, 3, 232 - end - 8, &FONT_XS, ui.msg[1], C_DIM);
+        return;
+    }
+    if (eng_punch) {
+        /* each effect held, its name piled on the others */
+        static const uint16_t INK[4] = {K_WHITE, RGB(255, 222, 96), RGB(150, 240, 255), RGB(255, 190, 220)};
+        int n = 0;
+        for (unsigned i = 0; i < PU_N; i++)
+            if (eng_punch >> i & 1u) {
+                char w[16];
+                s_copy(w, punch_name(i), 16);
+                if (i == PU_BUILD)                /* two Ds for each track it took this time: buil + 2, 4, 6 or 8 Ds */
+                    for (unsigned t = 0, first = 1; t < NTRACKS; t++)
+                        if (eng_build_mask >> t & 1u) {
+                            s_cat(w, first ? "d" : "dd");
+                            first = 0;
+                        }
+                s_upper(w);
+                g_center(n * 13 - (n & 1) * 26, (n % 3) - 1, 240, &FONT_S, w, INK[n & 3]);
+                n++;
+            }
+        return;
+    }
+    if (ui.poetry && ui.page == P_EFFECTS) {
+        /* the SLAMJAM room: the show's own header, the track your black keys play and its sound (PRESETS changes it) */
+        int tw = g_tw(&FONT_XS, TRACK_NAME[ui.track]) + 10;
+        g_round(4, 4, tw, 15, 7, K_TRACK[ui.track]);
+        g_text(9, 0, tw, &FONT_XS, TRACK_NAME[ui.track], K_WHITE);
+        const track_t *k = &song.track[ui.track];
+        const char *snd = ui.track == T_VOICE ? JAM_NAME[0][poem.style[0] % 3u]
+                          : ui.track == T_DRUMS ? engine_kit_name(k->sound) : PRESETS[k->sound].name;
+        char t[40] = "";
+        if (ui.track == T_VOICE && ui.ntune) {    /* the tune being gathered: its last notes, and how many of how many */
+            int r = tune_row();
+            for (unsigned i = ui.ntune > 5u ? ui.ntune - 5u : 0u; i < ui.ntune; i++) {
+                s_cat(t, NOTE_NAME[ui.tune[i] % 12u]);
+                s_cat(t, " ");
+            }
+            s_num(t, ui.ntune);
+            s_cat(t, "/");
+            s_num(t, r >= 0 ? song.line[song.row[r].line].count : 0);
+            snd = t;
+        }
+        g_text(4 + tw + 8, 0, 200 - tw, &FONT_S, snd, ui.ntune && ui.track == T_VOICE ? K_WHITE : C_INK);
+        if (eng_playing)
+            for (int i = 0; i < 9; i++)
+                g_rect(226 + i / 2, 6 + i / 2, 1, 10 - (i / 2) * 2, K_WHITE);
+        if (ui.dirty)
+            g_disc(234, 4, 3, K_CORAL);
         return;
     }
     int x = g_cap(4, 4, BUTTON_CAP[PAGE_BUTTON[ui.page]], 0);
-    g_text(x + 5, 0, 90, &FONT_S, PAGE_NAME[ui.page], K_INK);
+    g_text(x + 5, 0, 90, &FONT_S, ui.poetry && ui.page == P_SING ? "Practice" : PAGE_NAME[ui.page], C_INK);
     int px = 118;
-    if (ui.page == P_SING || ui.page == P_SONG) {
-        /* HOME's other view, a press away */
-        const char *other = PAGE_NAME[ui.page == P_SING ? P_SONG : P_SING];
-        int ox = x + 5 + g_tw(&FONT_S, PAGE_NAME[ui.page]) + 6;
-        g_text(ox, 3, 60, &FONT_XS, other, K_DIM);
-        px = ox + g_tw(&FONT_XS, other) + 8;
-    }
     /* the track, in its colour */
     int tw = g_tw(&FONT_XS, TRACK_NAME[ui.track]) + 10;
     g_round(px, 4, tw, 15, 7, K_TRACK[ui.track]);
@@ -53,58 +103,65 @@ static void draw_header(void)
     char t[24] = "";
     if (eng_playing) {
         s_place(t, eng_tick, song.steps);
-        g_right(150, 1, 72, &FONT_XS, t, K_TEAL);
+        g_right(150, 1, 72, &FONT_XS, t, K_WHITE);
         /* the play triangle */
         for (int i = 0; i < 9; i++)
-            g_rect(226 + i / 2, 6 + i / 2, 1, 10 - (i / 2) * 2, ui.rec ? K_CORAL : K_TEAL);
+            g_rect(226 + i / 2, 6 + i / 2, 1, 10 - (i / 2) * 2, K_WHITE);
     } else {
         s_num(t, song.bpm);
         s_cat(t, " BPM");
-        g_right(150, 1, 78, &FONT_XS, t, K_DIM);
+        g_right(150, 1, 78, &FONT_XS, t, C_DIM);
     }
     if (ui.dirty)
         g_disc(234, 4, 3, K_CORAL);
 }
 
 /* ---- the knob strip ---- */
-static void draw_strip(const char *tag)
+/* each knob its colour, on every page: blue, yellow, green, orange */
+static const uint16_t KNOB_COL[4] = {RGB(70, 140, 240), RGB(240, 196, 40), RGB(70, 190, 90), RGB(250, 140, 40)};
+__attribute__((noinline)) static void draw_strip(const char *tag)
 {
-    g_rect(0, Y_STRIP, 240, 64, K_PAPER);
-    g_rect(4, Y_STRIP + 8, 232, 1, K_RULE);
+    if (!g_visible(Y_STRIP, 64))
+        return;
+    g_rect(0, Y_STRIP, 240, 64, C_BG);
+    g_rect(4, Y_STRIP + 8, 232, 1, C_RULE);
     int tw = g_tw(&FONT_XS, tag) + 8;
-    g_rect(4, Y_STRIP, tw, 16, K_PAPER);
-    g_text(6, Y_STRIP - 1, 180, &FONT_XS, tag, K_DIM);
+    g_rect(4, Y_STRIP, tw, 16, C_BG);
+    g_text(6, Y_STRIP - 1, 180, &FONT_XS, tag, C_DIM);
     unsigned n = page_count();
     if (n > 1)
         for (unsigned i = 0; i < n; i++)
-            g_disc(232 - (int)(n - 1 - i) * 9, Y_STRIP + 8, 3, i == ui.sub[ui.page] ? K_INK : K_FAINT);
+            g_disc(232 - (int)(n - 1 - i) * 9, Y_STRIP + 8, 3, i == ui.sub[ui.page] ? C_INK : C_FAINT);
     for (unsigned k = 0; k < 4; k++) {
         knob_t r = knob_info(k);
         int x = 4 + (int)k * 59;
         int hot = flashing() && ui.flash_step == (int16_t)(100 + k);
-        g_text(x + 2, Y_STRIP + 15, 56, &FONT_XS, r.name, r.name[0] == '-' ? K_FAINT : K_INK);
+        g_text(x + 2, Y_STRIP + 15, 56, &FONT_XS, r.name, r.name[0] == '-' ? C_FAINT : C_INK);
         if (r.name[0] == '-')
             continue;
         int range = r.hi - r.lo, fill = range ? (r.value - r.lo) * 52 / range : 0;
-        g_round(x + 2, Y_STRIP + 33, 52, 5, 2, K_RULE);
-        g_round(x + 2, Y_STRIP + 33, fill < 4 ? 4 : fill, 5, 2, hot ? K_CORAL : K_DIM);
+        g_round(x + 2, Y_STRIP + 33, 52, 5, 2, C_RULE);
+        g_round(x + 2, Y_STRIP + 33, fill < 4 ? 4 : fill, 5, 2, hot ? C_INK : KNOB_COL[k]);
         char v[16];
         knob_text(k, &r, v);
-        g_text(x + 2, Y_STRIP + 39, 56, &FONT_S, v, hot ? K_CORAL : K_INK);
+        const felucca_font_t *vf = g_tw(&FONT_S, v) > 56 ? &FONT_XS : &FONT_S;   /* a long word: the small face */
+        g_text(x + 2, Y_STRIP + 39 + (vf == &FONT_XS ? 3 : 0), 56, vf, v, hot ? K_CORAL : C_INK);
     }
 }
 
 /* ---- the footer: controls as printed, each with its job ---- */
-static void draw_footer(const char *const *parts, unsigned n)
+__attribute__((noinline)) static void draw_footer(const char *const *parts, unsigned n)
 {
-    g_rect(0, Y_FOOT, 240, 16, K_PANEL);
+    if (!g_visible(Y_FOOT, 16))
+        return;
+    g_rect(0, Y_FOOT, 240, 16, C_PANEL);
     int x = 3;
     for (unsigned i = 0; i + 1 < n + 1 && i < n; i += 2) {
         int round = parts[i][0] == '(';
         const char *cap = round ? parts[i] + 1 : parts[i];
         x = g_cap(x, Y_FOOT + 1, cap, round);
         if (i + 1 < n) {
-            g_text(x + 3, Y_FOOT - 1, 236 - x, &FONT_XS, parts[i + 1], K_INK);
+            g_text(x + 3, Y_FOOT - 1, 236 - x, &FONT_XS, parts[i + 1], C_INK);
             x += g_tw(&FONT_XS, parts[i + 1]) + 9;
         }
         if (x > 230)
@@ -161,7 +218,7 @@ static void face_state(face_t *f)
     f->open = (float)eng_sing_open / 127.0f;
     f->pitch = eng_sing_pitch;
     f->vibrato = eng_sing_vibrato;
-    f->body = (float)song.voice[V_BODY] * 0.01f;
+    f->body = 0.5f;
     f->hop_at = hop_at;
     f->punch = eng_punch;
     f->now = plat_ms();
@@ -224,27 +281,9 @@ static void lyric_run(int y, int a, int e)
     for (int i = a; i < e; i++) {
         int cw = ly.pw[i + 1] - ly.pw[i], sung = i >= ly.word_at && i < ly.word_end;
         if (sung)
-            g_rect(x - 1, y + 2, cw + 2, 20, K_TEAL_T);
-        ch_put(x, y, ly.t[i], sung ? K_TEAL : K_INK);
+            g_rect(x - 1, y + 2, cw + 2, 20, K_TEAL);
+        ch_put(x, y, ly.t[i], sung ? K_WHITE : C_INK);
         x += cw;
-    }
-}
-
-static void page_sing(void)
-{
-    face_t f;
-    face_state(&f);
-    int y = Y_MAIN + 112;
-    face_draw(120, Y_MAIN - (ly.brk >= 0 ? 18 : 0), &f);
-    if (ly.bar >= 0) {
-        g_rect(20, y + 8, 200, 8, K_RULE);
-        g_rect(20, y + 8, ly.bar, 8, K_TEAL);
-    } else if (!ly.t)
-        g_center(0, y + 2, 240, &FONT_S, song.name, K_DIM);
-    else {                                    /* one line, or two with the second where the one always sat */
-        int two = ly.brk >= 0;
-        for (int r = 0; r <= two; r++)
-            lyric_run(y - 20 * (two - r), r ? ly.brk + 1 : 0, r == two ? ly.n : ly.brk);
     }
 }
 
@@ -255,182 +294,211 @@ static void line_label(char *d, unsigned line)
     s_num(d, (int)line + 1);
 }
 
-static void page_lines_entry(void)
+/* ---- Song (the sequencer zoomed out): every track's chain, and the shown track's phrases ---- */
+/* the four chains over the song, a bar a cell (a bar past a chain's end is its repeat, faint), each phrase's
+ * start a gap; the cursor's phrase ringed; then the shown track's phrases, a row each */
+__attribute__((noinline)) static void page_arrange(void)
 {
-    unsigned line = ui.entry_line, syl = line_syllables(line);
-    const line_t *L = &song.line[line];
-    line_offsets(line);
-    /* the words, the next syllable to write in coral */
-    const char *t = L->text;
-    int x = 8, y = Y_MAIN + 4, n = (int)strlen(t);
-    int cur = ui.entry_syl < SONG_SYLLABLES && ui.offsets[ui.entry_syl] != 255 ? ui.offsets[ui.entry_syl] : -1;
-    int cur_end = ui.entry_syl + 1u < syl && ui.offsets[ui.entry_syl + 1] != 255 ? ui.offsets[ui.entry_syl + 1] : n;
-    for (int i = 0; i < n; i++) {
-        int w = ch_w(t[i]);
-        if (x + w > 232) {
-            x = 8;
-            y += 22;
+    unsigned T = ui.track, total = song.bars;
+    int playing_bar = eng_playing ? (int)(eng_tick / song.steps) : -1;
+    for (unsigned t = 0; t < NTRACKS; t++) {
+        int y = Y_MAIN + 3 + (int)t * 11;
+        for (unsigned b = 0; b < total; b++) {
+            unsigned lb = b % song.lane_bars[t], v = song.lane[t][lb];
+            int x = 4 + (int)(b * 232u / total), w = 4 + (int)((b + 1) * 232u / total) - x;
+            uint16_t c = (t != T_VOICE && (v & 31u) >= SONG_PATTERNS) ? K_PANEL : b < song.lane_bars[t] ? K_TRACK[t] : K_FAINT;
+            g_rect(x + ((v & LANE_START) && w > 2), y, w - ((v & LANE_START) && w > 2), 9, c);
         }
-        int here = cur >= 0 && i >= cur && i < cur_end && t[i] != ' ';
-        if (here)
-            g_rect(x - 1, y + 2, w + 2, 20, K_CORAL_T);
-        ch_put(x, y, t[i], here ? K_CORAL : i < (cur < 0 ? n : cur) ? K_INK : K_DIM);
+    }
+    unsigned b0 = lane_start(&song, T, ui.ph), n = lane_len(&song, T, ui.ph);
+    int x0 = 4 + (int)(b0 * 232u / total), x1 = 4 + (int)((b0 + n) * 232u / total);
+    g_ring(x0 - 2, Y_MAIN + 1 + (int)T * 11, x1 - x0 + 4, 13, 2, 2, ui.moving ? K_INK : K_CORAL, K_TRACK[T]);
+    if (playing_bar >= 0)
+        g_rect(4 + playing_bar * 232 / (int)total, Y_MAIN + 1, 2, 45, K_TEAL);
+    /* the phrases */
+    unsigned count = lane_count(&song, T), first = ui.ph > 1 ? ui.ph - 1u : 0;
+    if (first + 4 > count)
+        first = count > 4 ? count - 4 : 0;
+    int now = playing_bar >= 0 ? (int)lane_find(&song, T, lane_tick(&song, T, eng_tick) / song.steps) : -1;
+    for (unsigned i = first; i < count && i < first + 4; i++) {
+        int y = Y_MAIN + 50 + (int)(i - first) * 21;
+        unsigned b = lane_start(&song, T, i), len = lane_len(&song, T, i);
+        uint16_t inside = (int)i == now ? K_TEAL_T : flashing() && ui.flash_row == (int16_t)i ? K_CORAL_T : K_PAPER;
+        if (i == ui.ph)
+            g_ring(1, y - 1, 238, 21, 6, 2, ui.moving ? K_INK : K_CORAL, inside);
+        else if (inside != K_PAPER)
+            g_round(2, y, 236, 19, 5, inside);
+        char t[48] = "";
+        s_num(t, (int)b + 1);
+        if (len > 1) {
+            s_cat(t, "-");
+            s_num(t, (int)(b + len));
+        }
+        g_right(2, y + 2, 34, &FONT_XS, t, K_DIM);
+        t[0] = 0;
+        if (T == T_VOICE) {                       /* its first line's words */
+            for (unsigned r = 0; r < song.rows && !t[0]; r++)
+                if (row_bar(&song, r) >= b && row_bar(&song, r) < b + len)
+                    s_copy(t, song.line[song.row[r].line].text[0] ? song.line[song.row[r].line].text : "(no words)", sizeof t);
+            if (!t[0])
+                s_cat(t, "(rest)");
+        } else {                                  /* its bars, a block each: pale a rest, dotted when linked */
+            for (unsigned j = 0; j < len && j < 18; j++) {
+                unsigned m = song.lane[T][b + j] & 31u, uses = 0;
+                for (unsigned c = 0; c < song.lane_bars[T]; c++)
+                    uses += (song.lane[T][c] & 31u) == m;
+                g_round(44 + (int)j * 10, y + 4, 8, 12, 2, m < SONG_PATTERNS ? K_TRACK[T] : K_RULE);
+                if (m < SONG_PATTERNS && uses > 1)
+                    g_rect(47 + (int)j * 10, y + 8, 2, 4, K_PAPER);
+            }
+            continue;
+        }
+        g_text(42, y - 1, 190, &FONT_S, t, t[0] == '(' ? K_FAINT : (int)i == now ? K_TEAL : K_INK);
+    }
+    if (count < 4)                                /* what comes next, under the last */
+        g_text(42, Y_MAIN + 52 + (int)(count - first) * 21, 190, &FONT_XS, "SEL, ADD: a new phrase", K_FAINT);
+}
+
+/* ---- Phrase: a bar of the cursor's phrase ---- */
+/* ---- the Voice's phrase, under its roll: the words, the cursor's word lit, those no note sings in coral ---- */
+__attribute__((noinline)) static void phrase_words(void)
+{
+    if (ui.row >= song.rows)
+        return;
+    unsigned line = song.row[ui.row].line, syl = line_syllables(line), left = line_unsung(line), n = 0;
+    unsigned ws = line_word(line, cursor_syl(ui.row)), we = ws, tail = left ? line_word(line, syl - left) : 255;
+    const char *t = song.line[line].text;
+    while (t[n])
+        n++;
+    while (ws < n && t[we] && t[we] != ' ')
+        we++;
+    int x = 4, y = Y_STRIP - 15;
+    for (unsigned a = ws < n && ws > 10 ? ws - 10 : 0, e; a < n && x < 236; a = e) {
+        unsigned k = a >= ws && a < we ? 2u : a >= tail;
+        char b[64];
+        for (e = a; e < n && (e >= ws && e < we ? 2u : e >= tail) == k && e - a < 63; e++)
+            b[e - a] = t[e];
+        b[e - a] = 0;
+        int w = g_tw(&FONT_XS, b);
+        if (k == 2)
+            g_rect(x - 1, y - 1, w + 2, 13, K_CORAL);
+        g_text(x, y, 236 - x, &FONT_XS, b, k == 2 ? K_WHITE : k ? K_CORAL : K_INK);
         x += w;
     }
-    /* the tune so far: a bar a note, height by pitch */
-    int top = Y_MAIN + 72, h = 56, span = (int)ui.entry_at + ui.entry_len;
-    if (span < 16)
-        span = 16;
-    /* the pitch range: the line's notes, at least an octave */
-    int lo = 127, hi = 0;
-    for (unsigned i = 0; i < L->count; i++) {
-        int p = song.note[L->first + i].pitch;
-        lo = p < lo ? p : lo;
-        hi = p > hi ? p : hi;
+}
+
+__attribute__((noinline)) static void page_phrase(void)
+{
+    unsigned steps = song.steps, len = lane_len(&song, ui.track, ui.ph);
+    int cw = 208 / (int)steps, x0 = 28, top = Y_MAIN + (ui.track == T_DRUMS ? 7 : 12), h = (ui.track == T_VOICE ? 144 : 160) - top;
+    /* the phrase's bars, this one dark */
+    for (unsigned j = 0; j < len && j < 16; j++)
+        g_round(x0 + (int)j * 13, Y_MAIN + 1, 11, 5, 2, j == ui.pbar ? K_INK : K_RULE);
+    unsigned now = eng_playing ? lane_tick(&song, ui.track, eng_tick) : 0;
+    unsigned play_step = eng_playing && now / steps == ui.bar ? now % steps : 255;
+    for (unsigned s = 0; s < steps; s++)
+        g_rect(x0 + (int)s * cw, top, cw - 1, h, s == play_step ? K_TEAL_T : (int)s == (ui.track == T_DRUMS ? ui.hold : ui.step)
+                                                   ? K_CORAL_T : (s / 4) & 1 ? K_PANEL : K_PAPER);
+    if (ui.track == T_DRUMS) {
+        const step_t *S = bar_steps(0);
+        for (unsigned lane = 0; lane < 11; lane++) {
+            int y = Y_MAIN + 7 + (int)lane * 12;
+            static const char *const N[11] = {"KK", "SN", "LT", "MT", "HT", "RM", "CP", "CB", "CY", "OH", "CH"};
+            g_text(4, y - 4, 24, &FONT_XS, N[lane], lane == ui.lane ? K_CORAL : K_DIM);
+            for (unsigned s = 0; s < steps; s++)
+                if (S[s].drums >> lane & 1u)
+                    g_round(x0 + (int)s * cw + 1 + S[s].nudge, y, cw - 3, 8, 2, lane == ui.lane ? K_INK : K_DIM);
+        }
+        return;
+    }
+    /* a roll: the notes at their pitch, as long as they last, a nudge a pixel or two off the grid */
+    int lo = 127, hi = 0, nn = 0;
+    struct { int16_t x, w; uint8_t p, hot; } nt[48];
+    if (ui.track == T_VOICE) {
+        unsigned b = lane_start(&song, T_VOICE, ui.ph), t0 = (unsigned)ui.bar * steps;
+        for (unsigned r = 0; r < song.rows; r++) {
+            const line_t *L = &song.line[song.row[r].line];
+            if (row_bar(&song, r) < b || row_bar(&song, r) >= b + len)
+                continue;
+            for (unsigned i = 0; i < L->count && nn < 48; i++) {
+                const note_t *n = &song.note[L->first + i];
+                int a = (int)(song.row[r].at + n->at) - (int)t0;
+                if (a + n->length <= 0 || a >= (int)steps)
+                    continue;
+                nt[nn++] = (typeof(nt[0])){(int16_t)(a * cw + note_nudge(n)), (int16_t)(n->length * cw - 2), n->pitch,
+                                           (uint8_t)(a <= ui.step && ui.step < a + n->length)};
+            }
+        }
+    } else {
+        const step_t *S = bar_steps(0);
+        for (unsigned s = 0; s < steps; s++)
+            for (unsigned k = 0; k < S[s].count && nn < 48; k++)
+                nt[nn++] = (typeof(nt[0])){(int16_t)((int)s * cw + S[s].nudge), (int16_t)(S[s].length * cw - 2), S[s].note[k],
+                                           (uint8_t)(s <= ui.step && ui.step < s + S[s].length)};
+    }
+    for (int i = 0; i < nn; i++) {
+        lo = nt[i].p < lo ? nt[i].p : lo;
+        hi = nt[i].p > hi ? nt[i].p : hi;
     }
     if (lo > hi)
-        lo = hi = 60;
+        lo = hi = ui.track == T_BASS ? 40 : 60;
     if (hi - lo < 12) {
         lo -= (12 - (hi - lo)) / 2;
         hi = lo + 12;
     }
-    g_rect(4, top - 2, 232, h + 4, K_PANEL);
-    for (unsigned i = 0; i < L->count; i++) {
-        const note_t *nt = &song.note[L->first + i];
-        int nx = 6 + (int)nt->at * 228 / span, nw = (int)nt->length * 228 / span - 1;
-        int ny = top + h - 8 - ((int)nt->pitch - lo) * (h - 10) / (hi - lo);
-        g_round(nx, ny, nw < 2 ? 2 : nw, 5, 2, nt->tie ? K_DIM : K_INK);
+    /* the roll's top and bottom rows, ruled and named where its notes sit (a note is 6 tall, centred on its row) */
+    int y_hi = top + 5, y_lo = top + h - 5;
+    g_rect(x0, y_hi, (int)steps * cw, 1, K_RULE);
+    g_rect(x0, y_lo, (int)steps * cw, 1, K_RULE);
+    for (int i = 0; i < nn; i++) {
+        int x = nt[i].x, w = nt[i].w;
+        if (x < 0)
+            w += x, x = 0;
+        if (x + w > (int)steps * cw - 2)
+            w = (int)steps * cw - 2 - x;
+        g_round(x0 + x + 1, top + h - 8 - (nt[i].p - lo) * (h - 10) / (hi - lo), w < 2 ? 2 : w, 6, 2, nt[i].hot ? K_CORAL : K_INK);
     }
-    int cx = 6 + (int)ui.entry_at * 228 / span;
-    g_rect(cx, top - 2, 2, h + 4, K_CORAL);
-    char m[40] = "";
-    s_num(m, ui.entry_syl < syl ? ui.entry_syl + 1 : (int)syl);
-    s_cat(m, " of ");
-    s_num(m, (int)syl);
-    s_cat(m, " syllables");
-    g_text(8, Y_MAIN + 50, 220, &FONT_XS, m, K_DIM);
+    char t[8] = "";
+    s_note(t, (unsigned)hi);
+    g_text(2, y_hi - 5, 26, &FONT_XS, t, K_DIM);
+    t[0] = 0;
+    s_note(t, (unsigned)lo);
+    g_text(2, y_lo - 5, 26, &FONT_XS, t, K_DIM);
+    int cx = x0 + (int)ui.step * cw;               /* the cursor: the keys write here */
+    g_rect(cx - 1, top, 2, h, K_CORAL);
+    g_rect(cx + cw - 2, top, 2, h, K_CORAL);
+    if (ui.track == T_VOICE)
+        phrase_words();
 }
 
-static void page_lines(void)
+/* ---- Arp: the notes a held C major chord would make ---- */
+__attribute__((noinline)) static void page_arp(void)
 {
-    if (ui.entry) {
-        page_lines_entry();
+    if (ui.track != T_KEYS && ui.track != T_BASS) {
+        g_center(0, Y_MAIN + 52, 240, &FONT_S, "Keys and Bass arpeggiate", K_DIM);   /* (the strip's knobs are dark) */
         return;
     }
-    unsigned rows = song.rows + 1u, first = ui.row > 2 ? ui.row - 2u : 0;
-    if (first + 6 > rows)
-        first = rows > 6 ? rows - 6 : 0;
-    for (unsigned i = first; i < rows && i < first + 6; i++) {
-        int y = Y_MAIN + 2 + (int)(i - first) * 22;
-        int cursor = i == ui.row, playing = i < song.rows && eng_playing && eng_sing_row == (int)i;
-        /* the place: the cursor's ring (coral), the row sounding now (teal), an edit landing (coral tint) */
-        uint16_t inside = playing ? K_TEAL_T : flashing() && ui.flash_row == (int16_t)i ? K_CORAL_T : K_PAPER;
-        if (cursor && ui.moving)
-            g_round(1, y - 1, 238, 23, 6, K_CORAL_T), g_ring(1, y - 1, 238, 23, 6, 3, K_CORAL, K_CORAL_T);
-        else if (cursor)
-            g_ring(1, y - 1, 238, 23, 6, 2, K_CORAL, inside);
-        else if (inside != K_PAPER)
-            g_round(2, y, 236, 21, 5, inside);
-        if (i == song.rows) {
-            g_text(46, y, 190, &FONT_S, "+", cursor ? K_CORAL : K_DIM);
-            g_text(62, y + 3, 170, &FONT_XS, "SEL: new line", cursor ? K_DIM : K_FAINT);
-            continue;
-        }
-        const row_t *R = &song.row[i];
-        char p[16] = "";
-        s_num(p, R->at / song.steps + 1);
-        if (R->at % song.steps) {
-            s_cat(p, ".");
-            s_num(p, (int)(R->at % song.steps / 4 + 1));
-        }
-        g_right(2, y + 3, 26, &FONT_XS, p, K_DIM);
-        /* the line's number: dark when other rows sing the same line */
-        char l[8] = "";
-        line_label(l, R->line);
-        int shared = line_rows(&song, R->line) > 1;
-        g_round(32, y + 3, 26, 15, 4, shared ? K_INK : K_PANEL);
-        g_center(32, y + 1, 26, &FONT_XS, l, shared ? K_PAPER : K_INK);
-        const line_t *L = &song.line[R->line];
-        g_text(64, y, 162, &FONT_S, L->text[0] ? L->text : "(no words)", L->text[0] ? (playing ? K_TEAL : K_INK) : K_FAINT);
-        if (L->text[0] && !L->count)
-            g_disc(230, y + 11, 3, K_CORAL);          /* words with no tune yet */
+    const uint8_t *a = song.track[ui.track].arp;
+    unsigned type = a[0] & 15u, oct = (a[0] >> 4 & 3u) + 1u, n = 3u * oct, gate = a[2] ? a[2] : 50u;
+    static const uint8_t SIX[NARP_RATE] = {24, 12, 8, 6, 4, 3};
+    int w = SIX[a[1] % NARP_RATE] * 2, top = Y_MAIN + 8, h = 120;
+    uint32_t seed = 1;
+    g_rect(4, top + h, 232, 1, K_RULE);
+    for (int x = 4, i = 0; x < 236; x += w, i++) {
+        unsigned j = type ? arp_order(type, n, (unsigned)i, &seed) : 0;
+        int y = top + h - 10 - (int)j * (h - 14) / (int)(n > 1 ? n - 1 : 1);
+        int nw = w * (int)gate / 100 - 1;
+        if (!type)
+            break;                                /* off: the notes as written */
+        g_round(x, y, nw < 2 ? 2 : nw > 236 - x ? 236 - x : nw, 6, 2, K_TRACK[ui.track]);
     }
-}
-
-/* ---- Steps: a pattern ---- */
-static void page_steps(void)
-{
-    unsigned pat = song.chain[ui.bar] % SONG_PATTERNS, steps = song.steps;
-    const pattern_t *P = &song.pattern[pat];
-    int cw = 208 / (int)steps, x0 = 28;
-    unsigned play_step = eng_playing && eng_tick / steps == ui.bar ? eng_tick % steps : 255;
-    if (ui.track == T_DRUMS || ui.track == T_VOICE) {
-        for (unsigned lane = 0; lane < 11; lane++) {
-            int y = Y_MAIN + 2 + (int)lane * 12;
-            static const char *const S[11] = {"KK", "SN", "LT", "MT", "HT", "RM", "CP", "CB", "CY", "OH", "CH"};
-            g_text(4, y - 2, 24, &FONT_XS, S[lane], lane == ui.lane ? K_CORAL : K_DIM);
-            for (unsigned s = 0; s < steps; s++) {
-                const step_t *st = &P->step[T_DRUMS - 1][s];
-                int on = (st->drums >> lane) & 1u;
-                int x = x0 + (int)s * cw;
-                uint16_t bg = s == play_step ? K_TEAL_T : (s / 4) & 1 ? K_PANEL : K_PAPER;
-                g_rect(x, y, cw - 1, 11, bg);
-                if (on)
-                    g_round(x + 1, y + 1, cw - 3, 9, 2, lane == ui.lane ? K_INK : K_DIM);
-            }
-        }
-    } else {
-        /* a roll: each step's notes at their pitch, as long as they last */
-        const step_t *S = P->step[ui.track - 1];
-        int lo = 127, hi = 0;
-        for (unsigned s = 0; s < steps; s++)
-            for (unsigned k = 0; k < S[s].count; k++) {
-                if (S[s].note[k] < lo)
-                    lo = S[s].note[k];
-                if (S[s].note[k] > hi)
-                    hi = S[s].note[k];
-            }
-        if (lo > hi)
-            lo = hi = ui.track == T_BASS ? 40 : 60;
-        if (hi - lo < 12) {
-            lo -= (12 - (hi - lo)) / 2;
-            hi = lo + 12;
-        }
-        int top = Y_MAIN + 4, h = 128;
-        for (unsigned s = 0; s < steps; s++) {
-            int x = x0 + (int)s * cw;
-            g_rect(x, top, cw - 1, h, s == play_step ? K_TEAL_T : (s / 4) & 1 ? K_PANEL : K_PAPER);
-        }
-        for (unsigned s = 0; s < steps; s++)
-            for (unsigned k = 0; k < S[s].count; k++) {
-                int y = top + h - 8 - (S[s].note[k] - lo) * (h - 10) / (hi - lo);
-                int w = (int)S[s].length * cw - 2;
-                if (x0 + (int)s * cw + w > x0 + (int)steps * cw)
-                    w = x0 + (int)steps * cw - (x0 + (int)s * cw) - 2;
-                g_round(x0 + (int)s * cw + 1, y, w, 6, 2, flashing() && ui.flash_step == (int16_t)s ? K_CORAL : K_INK);
-            }
-        char t[8] = "";
-        s_note(t, (unsigned)hi);
-        g_text(2, top - 3, 26, &FONT_XS, t, K_DIM);
-        t[0] = 0;
-        s_note(t, (unsigned)lo);
-        g_text(2, top + h - 14, 26, &FONT_XS, t, K_DIM);
-    }
-    /* the cursor step */
-    int cx = x0 + (int)ui.step * cw;
-    g_rect(cx - 1, Y_MAIN, 2, H_MAIN - 2, ui.srec ? K_CORAL : K_FAINT);
-    g_rect(cx + cw - 2, Y_MAIN, 2, H_MAIN - 2, ui.srec ? K_CORAL : K_FAINT);
 }
 
 /* ---- Sound ---- */
-static void page_sound(void)
+__attribute__((noinline)) static void page_sound(void)
 {
-    if (ui.track == T_VOICE) {
-        face_t f;
-        face_state(&f);
-        face_draw(120, Y_MAIN, &f);
-        return;
-    }
+    if (ui.track == T_VOICE)
+        return;                               /* the stage shows him */
     const track_t *k = &song.track[ui.track];
     if (ui.track == T_DRUMS) {
         for (unsigned i = 0; i < engine_kits(); i++) {
@@ -459,14 +527,10 @@ static void page_sound(void)
 }
 
 /* ---- Envelope: the shape of a note in time ---- */
-static void page_env(void)
+__attribute__((noinline)) static void page_env(void)
 {
-    if (ui.track == T_VOICE) {
-        face_t f;
-        face_state(&f);
-        face_draw(120, Y_MAIN, &f);
-        return;
-    }
+    if (ui.track == T_VOICE)
+        return;                               /* the stage shows him */
     /* rise, hold, fall: the attack and the release (Drums: the attack and the length) */
     int drums = ui.track == T_DRUMS;
     int atk = sound_value(ui.track, drums ? 5u : 6u), rel = sound_value(ui.track, drums ? 1u : 7u);
@@ -485,58 +549,8 @@ static void page_env(void)
     }
 }
 
-/* ---- Change: the bar's pattern, what SHIFT, PITCH and WEAVE do to it ---- */
-static void page_steps(void);
-static void page_change(void)
-{
-    if (ui.track == T_VOICE) {
-        if (ui.row < song.rows) {
-            const line_t *L = &song.line[song.row[ui.row].line];
-            g_text(8, Y_MAIN + 4, 224, &FONT_S, L->text[0] ? L->text : "(no words)", K_INK);
-        }
-        if (ui.row < song.rows) {             /* its tune: what PITCH moves */
-            const line_t *L = &song.line[song.row[ui.row].line];
-            int lo = 127, hi = 0, span = (int)line_span(&song, song.row[ui.row].line), top = Y_MAIN + 40, h = 80;
-            for (unsigned i = 0; i < L->count; i++) {
-                int p = song.note[L->first + i].pitch;
-                lo = p < lo ? p : lo;
-                hi = p > hi ? p : hi;
-            }
-            if (lo > hi || span < 1)
-                return;
-            if (hi - lo < 12) {
-                lo -= (12 - (hi - lo)) / 2;
-                hi = lo + 12;
-            }
-            g_rect(4, top - 2, 232, h + 4, K_PANEL);
-            for (unsigned i = 0; i < L->count; i++) {
-                const note_t *nt = &song.note[L->first + i];
-                int nx = 6 + (int)nt->at * 228 / span, nw = (int)nt->length * 228 / span - 1;
-                int ny = top + h - 8 - ((int)nt->pitch - lo) * (h - 10) / (hi - lo);
-                g_round(nx, ny, nw < 2 ? 2 : nw, 6, 2, flashing() ? K_CORAL : K_INK);
-            }
-        }
-        return;
-    }
-    page_steps();
-}
-
-/* ---- Effects: the punch-in keys ---- */
-static void page_effects(void)
-{
-    for (unsigned i = 0; i < PU_N; i++) {
-        int x = 4 + (int)(i % 4) * 58, y = Y_MAIN + 4 + (int)(i / 4) * 32;
-        int on = eng_punch >> i & 1u;
-        g_round(x, y, 56, 29, 6, on ? K_CORAL : K_PANEL);
-        char num[4] = "";
-        s_num(num, (int)i + 1);
-        g_text(x + 4, y - 1, 20, &FONT_XS, num, on ? K_WHITE : K_DIM);
-        g_text(x + 3, y + 12, 53, &FONT_XS, PUNCH_NAME[i], on ? K_WHITE : K_INK);
-    }
-}
-
 /* ---- Mixer ---- */
-static void page_mixer(void)
+__attribute__((noinline)) static void page_mixer(void)
 {
     unsigned sub = ui.sub[P_MIXER];
     static const char *const WHAT[3] = {"LEVEL", "REVERB", "DELAY"};
@@ -558,8 +572,11 @@ static void page_mixer(void)
 }
 
 /* ---- Setup and Status ---- */
-static void page_setup(void)
+__attribute__((noinline)) static void page_setup(void)
 {
+    /* the mode, first: what the FM-1 is (SELECT switches) */
+    g_round(150, Y_MAIN + 84, 82, 22, 6, ui.poetry ? K_CORAL : K_TEAL);
+    g_center(150, Y_MAIN + 86, 82, &FONT_S, ui.poetry ? "SLAMJAM" : "KARAOKE", K_WHITE);
     g_text(10, Y_MAIN + 4, 220, &FONT_S, song.name, K_INK);
     char t[48] = "";
     s_num(t, song.bars);
@@ -578,9 +595,9 @@ static void page_setup(void)
 }
 
 /* ---- overlays ---- */
-static void draw_slot_list(void)
+__attribute__((noinline)) static void draw_slot_list(void)
 {
-    static const char *const FOR[] = {"LOAD", "SAVE TO", "NEW SONG"};
+    static const char *const FOR[] = {"LOAD", "SAVE TO", "CLEAR SLOT"};
     g_rect(0, Y_MAIN, 240, H_MAIN + 2, K_PAPER);
     g_text(8, Y_MAIN - 1, 224, &FONT_XS, FOR[ui.slot_for == A_LOAD ? 0 : ui.slot_for == A_SAVE_TO ? 1 : 2], K_DIM);
     unsigned first = ui.list_pick > 4 ? ui.list_pick - 4u : 0;
@@ -598,7 +615,7 @@ static void draw_slot_list(void)
     }
 }
 
-static void draw_list(void)
+__attribute__((noinline)) static void draw_list(void)
 {
     if (ui.list == 2) {
         draw_slot_list();
@@ -620,42 +637,87 @@ static void draw_list(void)
     }
 }
 
+/* text wrapped at spaces to `width`, a new paragraph at each '|'; drawn from (x, y) when y >= 0. Returns its height */
+static int wrap_text(const char *s, int x, int y, int width, uint16_t fg)
+{
+    int h = 0;
+    while (*s) {
+        char row[48];
+        unsigned n = 0, space = 0;
+        while (s[n] && s[n] != '|' && n < sizeof row - 1) {
+            row[n] = s[n];
+            row[n + 1] = 0;
+            if (g_tw(&FONT_XS, row) > width)
+                break;
+            if (s[n] == ' ')
+                space = n;
+            n++;
+        }
+        if (s[n] && s[n] != '|' && space)
+            n = space;
+        row[n] = 0;
+        if (y >= 0)
+            g_text(x, y + h, width + 8, &FONT_XS, row, fg);
+        h += 15;
+        s += n;
+        while (*s == ' ')
+            s++;
+        if (*s == '|') {
+            s++;
+            h += 5;
+        }
+    }
+    return h;
+}
+
 static void draw_box(const char *title, const char *a, const char *b, uint16_t edge)
 {
     g_round(10, Y_MAIN + 14, 220, 100, 10, edge);
     g_round(13, Y_MAIN + 17, 214, 94, 8, K_PAPER);
     g_text(22, Y_MAIN + 22, 200, &FONT_S, title, K_INK);
-    /* the text, wrapped at spaces */
-    const char *parts[2] = {a, b};
-    int y = Y_MAIN + 48;
-    for (unsigned p = 0; p < 2; p++) {
-        const char *s = parts[p];
-        while (s && *s && y < Y_MAIN + 104) {
-            char row[48];
-            unsigned n = 0, space = 0;
-            while (s[n] && n < sizeof row - 1) {
-                row[n] = s[n];
-                row[n + 1] = 0;
-                if (g_tw(&FONT_XS, row) > 196)
-                    break;
-                if (s[n] == ' ')
-                    space = n;
-                n++;
-            }
-            if (s[n] && space)
-                n = space;
-            memcpy(row, s, n);
-            row[n] = 0;
-            g_text(22, y, 200, &FONT_XS, row, p ? K_DIM : K_INK);
-            y += 15;
-            s += n;
-            while (*s == ' ')
-                s++;
-        }
-    }
+    int h = a ? wrap_text(a, 22, Y_MAIN + 48, 196, K_INK) : 0;
+    if (b)
+        wrap_text(b, 22, Y_MAIN + 48 + h, 196, K_DIM);
 }
 
-static void draw_words(void)
+/* a button's help: the screen, then the buttons its screen doesn't label (card_text), then the knobs and the
+ * footer's buttons it does (made here, so they are always the screen's own) */
+#define CARD_W 218
+#define CARD_H 154                            /* the room for its text */
+static int card_h;
+static char *card_put(char *d, const char *s)
+{
+    while (*s && d < card_buf + sizeof card_buf - 1)
+        *d++ = *s++;
+    *d = 0;
+    return d;
+}
+static void draw_card(const char *const *foot, unsigned nf)
+{
+    const char *title, *t = card_text(ui.card - 1u, &title);
+    char *d = card_buf + strlen(t);
+    if (PAGE_BUTTON[ui.page] == ui.card - 1u) {
+        for (unsigned k = 0, n = 0; k < 4 && ui.page != P_PHRASE; k++) {
+            knob_t r = knob_info(k);
+            if (r.name[0] != '-') {
+                d = card_put(d, n++ ? ", " : "|Knobs: ");
+                d = card_put(d, r.name);
+            }
+        }
+        for (unsigned i = 0; i + 1 < nf; i += 2) {
+            d = card_put(d, i ? "; " : "|Shown: ");
+            d = card_put(d, foot[i] + (foot[i][0] == '('));
+            d = card_put(d, " ");
+            d = card_put(d, foot[i + 1]);
+        }
+    }
+    g_round(4, Y_MAIN + 2, 232, 196, 10, K_INK);   /* over the page and its knob strip; the footer stays */
+    g_round(7, Y_MAIN + 5, 226, 190, 8, K_PAPER);
+    g_text(16, Y_MAIN + 9, 208, &FONT_S, title, K_INK);
+    card_h = wrap_text(card_buf, 16, Y_MAIN + 32, CARD_W, K_INK);
+}
+
+__attribute__((noinline)) static void draw_words(void)
 {
     g_rect(0, Y_MAIN, 240, H_MAIN + 2, K_PAPER);
     if (ui.wtarget)
@@ -706,17 +768,62 @@ static void draw_words(void)
     }
 }
 
+#include "stage.h"
+
+/* Mister Wiggles' pages, where the stage is: Sing, the Voice's Sound and Envelope, FX's karaoke room */
+static int stage_page(void)
+{
+    return ui.page == P_SING || ui.page == P_EFFECTS || ((ui.page == P_SOUND || ui.page == P_ENV) && ui.track == T_VOICE);
+}
+
+/* the bottom bar while the song plays on the stage: the words being sung (or a rest's bar), the song's progress */
+__attribute__((noinline)) static void draw_lyrics(void)
+{
+    if (!g_visible(Y_STRIP, 240 - Y_STRIP))
+        return;
+    g_rect(0, Y_STRIP, 240, 240 - Y_STRIP, C_BG);
+    int y = Y_STRIP + 18;
+    if (ly.bar >= 0) {
+        g_rect(20, y + 12, 200, 8, C_RULE);
+        g_rect(20, y + 12, ly.bar, 8, K_TEAL);
+    } else if (!ly.t)
+        g_center(0, y + 6, 240, &FONT_S, song.name, C_DIM);
+    else {                                    /* one line, or two */
+        int two = ly.brk >= 0;
+        for (int r = 0; r <= two; r++)
+            lyric_run(y + (two ? 22 * r : 10), r ? ly.brk + 1 : 0, r == two ? ly.n : ly.brk);
+    }
+    unsigned len = song_ticks(&song);
+    g_rect(0, 234, 240, 3, C_PANEL);
+    g_rect(0, 234, len ? (int)(eng_tick * 240u / len) : 0, 3, K_TEAL);
+}
+
 /* ---- one frame: both halves ---- */
 static void draw_scene(void)
 {
+    g_dark = stage_page();
     draw_header();
-    g_rect(0, 23, 240, Y_STRIP - 23, K_PAPER);
+    if (g_dark)
+        stage_draw();
+    else
+        g_rect(0, 23, 240, Y_STRIP - 23, K_PAPER);
     const char *foot[10];
     unsigned nf = 0;
     char tag[48] = "";
     switch (ui.page) {
     case P_SING:
-        page_sing();
+        if (ui.poetry) {                          /* SLAMJAM: the knobs are the players' styles; a track taken is yours */
+            s_cat(tag, SETS[poem.set].name);      /* the band tonight, and whose keys are yours */
+            s_cat(tag, ", your keys: ");
+            s_cat(tag, TRACK_NAME[ui.track]);
+            if (song.track[ui.track].mute)
+                s_cat(tag, " (taken)");
+            foot[nf++] = "KEYS";
+            foot[nf++] = ui.track == T_VOICE ? "sing" : "play";
+            foot[nf++] = "HOME+BLACK";
+            foot[nf++] = "jam";
+            break;
+        }
         s_cat(tag, TRACK_NAME[ui.track]);
         s_cat(tag, ui.track == T_VOICE ? " sings" : " plays");
         foot[nf++] = "KEYS";
@@ -726,86 +833,54 @@ static void draw_scene(void)
             foot[nf++] = "sound";
         }
         break;
-    case P_SONG:
-        page_lines();
-        if (ui.row < song.rows) {
-            unsigned line = song.row[ui.row].line;
-            line_label(tag, line);
-            int n = line_rows(&song, line);
-            if (n > 1) {
-                s_cat(tag, " in ");
-                s_num(tag, n);
-                s_cat(tag, " rows");
-            }
-            s_cat(tag, " / row ");
-            s_num(tag, ui.row + 1);
-        } else
-            s_cat(tag, "the end");
-        if (ui.entry) {
-            foot[nf++] = "KEYS";
-            foot[nf++] = "note";
-            foot[nf++] = "OCT+";
-            foot[nf++] = "rest";
-            foot[nf++] = "OCT-";
-            foot[nf++] = "back";
-            foot[nf++] = "REC";
-            foot[nf++] = "done";
-        } else {
-            foot[nf++] = "KEYS";
-            foot[nf++] = "sing it";
-            foot[nf++] = "REC";
-            foot[nf++] = "notes";
-            foot[nf++] = "(PRESET";
-            foot[nf++] = "line";
-        }
+    case P_ARRANGE: {
+        page_arrange();
+        s_cat(tag, TRACK_NAME[ui.track]);
+        s_cat(tag, ": phrase ");
+        s_num(tag, ui.ph + 1);
+        s_cat(tag, " of ");
+        s_num(tag, (int)lane_count(&song, ui.track));
+        foot[nf++] = "SEL";
+        foot[nf++] = "add, dupe, move";
+        foot[nf++] = "HOME+SEQ";
+        foot[nf++] = "phrase";
         break;
-    case P_STEPS: {
-        page_steps();
-        s_cat(tag, "bar ");
-        s_num(tag, ui.bar + 1);
-        s_cat(tag, " plays P");
-        s_num(tag, song.chain[ui.bar] % SONG_PATTERNS + 1);
-        unsigned uses = 0;
-        for (unsigned b = 0; b < song.bars; b++)
-            uses += song.chain[b] == song.chain[ui.bar];
-        if (uses > 1) {
-            s_cat(tag, " (");
-            s_num(tag, (int)uses);
-            s_cat(tag, " bars)");
+    }
+    case P_PHRASE: {
+        page_phrase();
+        s_cat(tag, TRACK_NAME[ui.track]);
+        s_cat(tag, " bar ");
+        s_num(tag, ui.pbar + 1);
+        s_cat(tag, "/");
+        s_num(tag, (int)lane_len(&song, ui.track, ui.ph));
+        if (ui.track != T_DRUMS) {                /* where the cursor is */
+            s_cat(tag, " step ");
+            s_num(tag, ui.step + 1);
         }
-        if (ui.track == T_DRUMS) {
-            foot[nf++] = "WHITE";
-            foot[nf++] = "steps";
-            foot[nf++] = "BLACK";
-            foot[nf++] = DRUM_NAME[ui.lane];
-            foot[nf++] = "(PRESET";
-            foot[nf++] = "pattern";
-        } else if (ui.track == T_VOICE) {
-            foot[nf++] = "(ALGO";
-            foot[nf++] = "track";
-        } else if (ui.srec) {
-            foot[nf++] = "KEYS";
-            foot[nf++] = "write";
-            foot[nf++] = "OCT+";
-            foot[nf++] = "rest";
-            foot[nf++] = "REC";
-            foot[nf++] = "done";
-        } else {
-            static char notes[24];
-            unsigned m = ui.track - T_KEYS;
-            notes[0] = 0;
-            for (unsigned i = 0; i < ui.nmem[m]; i++) {
-                if (i)
-                    s_cat(notes, " ");
-                s_note(notes, ui.mem[m][i]);
+        if (ui.track != T_VOICE) {                /* a rest, or how many bars of the chain play this one */
+            unsigned m = song.lane[ui.track][ui.bar] & 31u, uses = 0;
+            for (unsigned b = 0; b < song.lane_bars[ui.track]; b++)
+                uses += (song.lane[ui.track][b] & 31u) == m;
+            if (m >= SONG_PATTERNS)
+                s_cat(tag, ", rest");
+            else if (uses > 1) {
+                s_cat(tag, ", linked to ");
+                s_num(tag, (int)uses - 1);
             }
-            foot[nf++] = "WHITE";
-            foot[nf++] = notes;
-            foot[nf++] = "SEQ+KEYS";
-            foot[nf++] = "notes";
-            foot[nf++] = "(PRESET";
-            foot[nf++] = "pattern";
+        } else if (ui.row < song.rows) {
+            unsigned line = song.row[ui.row].line, syl = line_syllables(line), cs = cursor_syl(ui.row);
+            line_label(s_cat(tag, " "), line);
+            if (syl) {                            /* the syllable the cursor is on, of the line's */
+                s_cat(tag, " syl ");
+                s_num(tag, (int)(cs < syl ? cs : syl - 1u) + 1);
+                s_cat(tag, "/");
+                s_num(tag, (int)syl);
+            }
         }
+        foot[nf++] = ui.track == T_DRUMS ? "WHITE" : "KEYS";
+        foot[nf++] = ui.track == T_DRUMS ? "steps" : eng_playing ? "play" : "write";
+        foot[nf++] = "HOME+SEQ";
+        foot[nf++] = ui.track == T_VOICE ? "words" : "song";
         break;
     }
     case P_SOUND:
@@ -836,28 +911,23 @@ static void draw_scene(void)
         foot[nf++] = "KEYS";
         foot[nf++] = ui.track == T_VOICE ? "sing" : "play";
         break;
-    case P_CHANGE: {
-        page_change();
-        if (ui.track == T_VOICE) {
-            s_cat(tag, "the line in Song");
-        } else {
-            s_cat(tag, "bar ");
-            s_num(tag, ui.bar + 1);
-            s_cat(tag, " plays P");
-            s_num(tag, song.chain[ui.bar] % SONG_PATTERNS + 1);
-        }
-        foot[nf++] = "SEL";
-        foot[nf++] = "weave in";
-        foot[nf++] = "(PRESET";
-        foot[nf++] = "pattern";
+    case P_ARP:
+        page_arp();
+        s_cat(tag, TRACK_NAME[ui.track]);
+        s_cat(tag, " arpeggiator");
+        foot[nf++] = "KEYS";
+        foot[nf++] = "hold notes";
         break;
-    }
-    case P_EFFECTS:
-        page_effects();
-        s_cat(tag, ui.sub[P_EFFECTS] ? "the master" : "reverb and delay");
+    case P_EFFECTS: {
+        static const char *const BANK[5] = {"echoes: reverb and delay", "the master", "the voice", "the voice's motion and reverb",
+                                            "the band: each player's style"};
+        s_cat(tag, BANK[ui.sub[P_EFFECTS] % 5u]);
         foot[nf++] = "WHITE";
         foot[nf++] = "effects";
+        foot[nf++] = "BLACK";
+        foot[nf++] = ui.poetry && ui.track == T_VOICE ? "his tune" : "play";
         break;
+    }
     case P_MIXER: {
         page_mixer();
         static const char *const W[3] = {"levels", "reverb sends", "delay sends"};
@@ -869,8 +939,10 @@ static void draw_scene(void)
     case P_SETUP:
         page_setup();
         s_cat(tag, "the song");
+        foot[nf++] = "(SELECT";
+        foot[nf++] = ui.poetry ? "karaoke" : "SLAMJAM";
         foot[nf++] = "SEL";
-        foot[nf++] = "songs";
+        foot[nf++] = "reset knobs";
         break;
     }
     if (ui.moving) {
@@ -894,6 +966,10 @@ static void draw_scene(void)
         foot[nf++] = "OCT-";
         foot[nf++] = "delete";
     }
+    if (ui.msg_kind == M_GATE && plat_ms() < ui.msg_until) {
+        draw_box(ui.msg[0], card_string(2u * CARD_GATE + 1u, card_buf, sizeof card_buf), 0, K_CORAL);
+        nf = 0;
+    }
     if (ui.ask) {
         draw_box(ui.ask_text, 0, 0, K_CORAL);
         nf = 0;
@@ -902,23 +978,49 @@ static void draw_scene(void)
         foot[nf++] = "HOME";
         foot[nf++] = "no";
     }
-    if (ui.card) {
-        const char *second, *first = card_text(ui.card - 1u, &second);
-        char title[16] = "";
-        s_cat(title, BUTTON_CAP[ui.card - 1u]);
-        draw_box(title, first, second, K_INK);
+    if (ui.card)
+        draw_card(foot, nf);
+    if (g_dark && eng_playing && !ui.list && !ui.ask && !ui.words && !ui.card && plat_ms() - ui.knob_at > 1500u &&
+        !(ui.poetry && ui.page != P_EFFECTS))
+        draw_lyrics();                        /* while it plays: the words; a knob turned shows the strip a moment (SLAMJAM:
+                                               * the words in the room only, where he says them) */
+    else {
+        if (!ui.card)
+            draw_strip(tag);
+        draw_footer(foot, nf);
     }
-    draw_strip(tag);
-    draw_footer(foot, nf);
+    if (g_dark)
+        stage_lip();
 }
 
 /* the lights: lit, what works here; the keys, what they do here (as 386DX always lit them) */
-static int key_of(unsigned pitch)
+static int key_of(unsigned pitch)            /* the key that plays this pitch (through the scale), -1 none */
 {
-    int k = (int)pitch - 53 - ui.octave * 12;
-    return k >= 0 && k < 27 ? k : -1;
+    for (unsigned k = 0; k < 27; k++)
+        if (key_note(k) == pitch)
+            return (int)k;
+    return -1;
 }
-static void leds(void)
+/* the keys that sound a pitch class in mask (bit 0 C), every octave */
+static uint32_t keys_in(uint16_t mask)
+{
+    uint32_t k = 0;
+    for (unsigned kk = 0; kk < 27; kk++)
+        if (mask >> (key_note(kk) % 12u) & 1u)
+            k |= 1u << kk;
+    return k;
+}
+/* SLAMJAM: the band's chord now (stopped, its first), as pitch classes: the keys that fit it */
+static uint16_t chord_now(void)
+{
+    const int8_t (*cyc)[2] = CYCLE[poem.cycle & 7u];
+    unsigned c = eng_playing ? (eng_tick / song.steps) & 3u : 0u, root = poem.key + (unsigned)cyc[c][0];
+    uint16_t m = 0;
+    for (unsigned i = 0; i < 4; i++)
+        m |= (uint16_t)(1u << (root + (unsigned)Q_TONE[cyc[c][1]][i]) % 12u);
+    return m;
+}
+__attribute__((noinline)) static void leds(void)
 {
     uint32_t now = plat_ms(), b, k = 0;
     int blink = now / 250u & 1u;
@@ -931,28 +1033,26 @@ static void leds(void)
         b = 1u << B_SEL | 1u << B_HOME;
     } else {
         b = 1u << PAGE_BUTTON[ui.page];
-        if (ui.rec || ui.entry || ui.srec || (ui.armed && blink))
+        if (ui.rec || (ui.armed && blink))
             b |= 1u << B_REC;
         if (eng_playing || (ui.armed && blink))
             b |= 1u << B_PLAY;
         if (ui.dirty)
             b |= 1u << B_SAVE;
-        if (ui.page == P_STEPS && ui.track != T_VOICE) {
-            /* the steps that play; the one playing now and the one held blink */
-            const pattern_t *P = &song.pattern[song.chain[ui.bar] % SONG_PATTERNS];
-            unsigned now_step = eng_playing && eng_tick / song.steps == ui.bar ? eng_tick % song.steps : 255;
-            for (unsigned kk = 0; kk < 27; kk++) {
-                int w = white_index(kk);
-                if (w < 0 || (unsigned)w >= song.steps)
-                    continue;
-                const step_t *st = &P->step[ui.track - 1][w];
-                int on = ui.track == T_DRUMS ? (st->drums >> ui.lane & 1u) : st->count != 0;
-                if ((unsigned)w == now_step || w == ui.hold)
-                    on = blink ? !on : on;
-                if (on)
+        if (ui.page == P_PHRASE && ui.track == T_DRUMS) {
+            uint32_t m = drum_marks();             /* the steps the shown drum hits (the playhead is on screen) */
+            for (unsigned kk = 0; kk < 27; kk++)
+                if (white_index(kk) >= 0 && m >> white_index(kk) & 1u)
+                    k |= 1u << kk;
+        } else if (ui.page == P_PHRASE) {
+            /* the notes at the cursor: steady where they start, blinking where one goes on from before */
+            uint8_t p[8], st[8];
+            for (unsigned i = 0, n = under_cursor(p, st); i < n; i++) {
+                int kk = key_of(p[i]);
+                if (kk >= 0 && (st[i] || blink))
                     k |= 1u << kk;
             }
-        } else if (ui.track == T_VOICE && (ui.page == P_SONG || (ui.page == P_SING && eng_playing)) && !ui.entry) {
+        } else if (ui.track == T_VOICE && (ui.page == P_ARRANGE || (ui.page == P_SING && eng_playing && !ui.poetry))) {
             /* the line's tune: the keys it sings lit, the next one to sing blinking */
             int line = focus_line();
             if (line >= 0) {
@@ -965,7 +1065,7 @@ static void leds(void)
                     if (kk < 0)
                         continue;
                     k |= 1u << kk;
-                    if (eng_playing ? (int)(L->first + i) == eng_sing_note : !n->tie && n->syllable == next && next_key < 0)
+                    if (eng_playing ? (int)(L->first + i) == eng_sing_note : !note_tie(n) && n->syllable == next && next_key < 0)
                         next_key = kk;
                 }
                 if (next_key >= 0 && blink)
@@ -978,8 +1078,12 @@ static void leds(void)
                         if (black_index(kk) == (int)t)
                             k |= 1u << kk;
         } else if (ui.page == P_EFFECTS) {
-            /* the effects are four to a row on the screen: the first key and every fourth after it are lit, to
-             * find your place by; the keys last used blink (steady while held, which ui.keys below lights) */
+            /* the first key of each family of four is lit, to find your place by; the keys last used blink
+             * (steady while held, which ui.keys below lights); SLAMJAM: the black keys in the band's chord */
+            if (ui.poetry && ui.track != T_DRUMS)
+                for (unsigned kk = 0, ch = keys_in(chord_now()); kk < 27; kk++)
+                    if (black_index((unsigned)kk) >= 0 && (ch >> kk & 1u))
+                        k |= 1u << kk;
             for (unsigned kk = 0; kk < 27; kk++) {
                 int w = white_index(kk);
                 if (w >= 0 && w % 4 == 0)
@@ -992,8 +1096,11 @@ static void leds(void)
                 }
             }
         } else {
-            for (unsigned kk = 0; kk < 27; kk++)  /* the white keys, there to play */
-                if (white_index(kk) >= 0)
+            /* the keys that fit: SLAMJAM, the band's chord now; else the song's key note, home, every octave; Drums,
+             * the keys with a drum; the key played last blinks */
+            k = ui.track == T_DRUMS ? 0u : ui.poetry ? keys_in(chord_now()) : keys_in((uint16_t)(1u << song.root % 12u));
+            for (unsigned kk = 0; ui.track == T_DRUMS && kk < 27; kk++)   /* Drums: the keys with a drum */
+                if (black_index(kk) >= 0 || (white_index(kk) >= 0 && white_index(kk) < 11))
                     k |= 1u << kk;
             if (ui.last_key < 27 && blink)
                 k ^= 1u << ui.last_key;
@@ -1008,19 +1115,40 @@ static void leds(void)
 void ui_frame(void)
 {
     input_poll();
+    if (ui.after_stop && !eng_playing) {          /* stopped now: the load, the poem or the mode it was waiting for */
+        unsigned a = ui.after_stop - 1u;
+        ui.after_stop = 0;
+        run_action(a);
+    }
+    engine_hush(ui.poetry && ui.page != P_EFFECTS);
+    if (ui.ntune && eng_playing && tune_row() != ui.tune_for)
+        tune_set(ui.tune_for);                    /* (its line came up before the notes were all in: what there is) */  /* SLAMJAM: the poet performs in the room, the band anywhere */
+    ui_draw();
+}
+
+/* the screen, when it is due. Also while the main loop waits for a sung clip (speech_background_service):
+ * drawing only reads, so the room keeps moving while the second core pronounces */
+static void ui_draw(void)
+{
     uint32_t now = plat_ms();
-    int animate = eng_playing || eng_sing_on || now < ui.msg_until || flashing() || ui.words || ui.card ||
-                  (ui.page == P_EFFECTS && eng_punch);
-    if (!animate && now - ui.frame_at < 200u && ui.last_input < ui.frame_at)
+    int animate = eng_playing || eng_sing_on || now < ui.msg_until || flashing() || ui.words || ui.card || eng_punch;
+    /* still: the stage's wall drifts at 15 frames a second, other pages wait for an input */
+    if (!animate && now - ui.frame_at < (stage_page() ? 66u : 200u) && ui.last_input < ui.frame_at)
         return;
     if (animate && now - ui.frame_at < 33u)
         return;
+    if (animate && ui.animated && now - ui.frame_at > ui.gap_ms)
+        ui.gap_ms = (uint8_t)(now - ui.frame_at > 255u ? 255u : now - ui.frame_at);
+    ui.animated = (uint8_t)animate;
     ui.frame_at = now;
-    for (int band = 0; band < 3; band++) {
+    for (int band = 0; band < NBANDS; band++) {
         g_begin(band, K_PAPER);
         draw_scene();
         cv_blit(0, (uint32_t)band * BAND);
     }
+    uint32_t took = plat_ms() - now;
+    if (took > ui.draw_ms)
+        ui.draw_ms = (uint8_t)(took > 255u ? 255u : took);
     eng_drum_hits = 0;
     leds();
 }

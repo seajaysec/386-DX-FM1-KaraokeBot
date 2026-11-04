@@ -1,0 +1,707 @@
+# SLAMJAM's words (tools/gen_poem.py packs them into build/gen/poem_data.h). Earnest performances about silly,
+# ordinary things, madlib style: a poem picks a frame (how it is told: an ode, a protest, a eulogy, a sportscast ...),
+# a topic and a hero, then fills a stanza plan (poem.h) from the frame's templates. The topic's words fill the slots,
+# but now and then a wildcard from anywhere takes a slot instead, so a poem about trucks can meet a rubber chicken.
+# Family-friendly by construction: only the words here can be said. ASCII only; a line expands to 63 characters at
+# most when its slots take their likely words (gen_poem.py checks; a line that runs over is made again);
+# tools/check_poem.py says every word with the FM-1's own voice, under the sanitizers.
+#
+# Slots, the topic's: {H} the hero, {HS} heroes; {n} a noun, {ns} nouns; {a} an adjective; {p} a place; {v} a verb.
+# Wildcards, from anywhere: {x} a thing, {xs} things; {X} a strange adjective; {l} a strange place; {m} a silly verb;
+# {k} someone; {f} the poem's core (one set for the whole poem: food, tools, gadgets ...); {e} an exclamation; {s} a sound; {N} a number; {t} a time; {d} a way of doing it;
+# {g} a grand noun; {G} a grand adjective. {T} (the intro only) is the poem's title.
+# A noun written "goose/geese" has its plural after the slash; with no slash the plural adds s.
+#
+# @frame NAME starts a frame (NAME is what it is called: A NEW ODE). Then its kinds: @intro, @title, @open, @image,
+# @ask, @rise, @vow, @refrain, @return, @close. A kind a frame leaves out comes from the first frame (slam).
+# @topic NAME, then H: n: a: p: v: lines, comma separated. @wild, then the wildcards' lines. @core NAME, then its
+# words: each poem picks one core, and every {f} in it comes from there.
+
+@frame slam
+@intro
+This one is called {T}.
+I call this one {T}.
+This next piece is called {T}.
+Okay. Okay. This one is called {T}.
+@title
+Ode to a {H}
+I Am the {H}
+Dear {H}
+{G} {H}
+@open
+I stand before you as a humble {H}.
+Listen. I have come to speak of {HS}.
+Tonight I speak for every {H}.
+My name is not important. I am a {H}.
+Friends. Neighbors. Fellow {HS}.
+{e}. I did not think I would be here tonight.
+@image
+a {a} {n} in the {p}
+the {n} remembers the {p}
+I saw a {n} at the edge of the {p}
+the {p} was {a}, and so was I
+one {n}, two {ns}, three {ns}
+there is a {n} in all of us
+I once saw {k} {m} {d}
+{N} {ns}, and not one of them was {a}
+it smelled like {f} and {xs}
+{s}! went the {n}. {s}! went my heart.
+we went to {l} {t}
+my heart is full of {f}
+@ask
+who will speak for the {ns}?
+do you hear the {n}?
+why must the {n} be {a}?
+what is a {H} without a {n}?
+and who among us has not been a {n}?
+how long must the {ns} wait?
+did {k} ever stop to {m}?
+@rise
+{G}! {G}! {G}!
+more {ns}! more {ns}! more {ns}!
+I will {v}, and I will {v} again!
+the {ns} will rise!
+I am {a}, I am {G}, I am {H}!
+{e}!
+@vow
+I declare a {g} of {ns}.
+and I will not be {a}.
+give me {ns} or give me {g}!
+I will {v} until the {p} is {a}.
+I will {m} {d}, starting {t}.
+@refrain
+I am the {H}, and I will not be quiet.
+I am the {H}. Remember me.
+Because I am a {H}.
+We are the {HS}, and we are here.
+@return
+still a {H}, but {G} now
+and the {p} was {a} again
+the {n} is {a}, and so am I
+I came here as a {H}. I leave as a {g}.
+@close
+Thank you. I have been a {H}.
+Snap if you feel me.
+Goodnight, {HS}.
+And that is all a {H} can say.
+The {H} has spoken.
+
+@frame ode
+@intro
+An ode. It is called {T}.
+This is an ode. {T}.
+@title
+Ode to a {H}
+O {H}
+@open
+O {H}! O {a} {H}!
+O {H}, thou art {G}.
+Sing, O muse, of the {a} {H}.
+Behold the {H}, {G} and {a}.
+@image
+thy {n} is like a {x} at dawn
+thou smellest of {f} and {g}
+O {H}, sweeter than {f}
+how {X} is thy {n}
+thou {m} {d} through the {p}
+@ask
+how shall I praise thee, {H}?
+O {H}, wherefore art thou {a}?
+@vow
+I shall carve thy name upon a {x}.
+I shall {v} for thee, {t} and always.
+forever shall I praise thy {ns}.
+@refrain
+O {H}, my {H}.
+O {H}, thou art {G}.
+@close
+O {H}. Farewell. Stay {a}.
+That was my ode. Thank you.
+And so, O {H}, I leave thee {a}.
+
+@frame protest
+@intro
+This is a protest. It is called {T}.
+Signs up. This one is called {T}.
+@title
+No More {ns}
+{HS} Unite
+Free the {HS}
+{HS} Forever
+Rise Up, {HS}
+@open
+We are here today because enough is enough.
+Fellow {HS}, they said we could not {v}.
+They told us to sit down. We did not sit down.
+We have a list of demands. It is long.
+@image
+they took our {ns} and gave us {xs}
+they put a {x} in the {p}
+we were promised {f}. where are the {f}?
+@ask
+what do we want? {ns}! when? {t}!
+who decided the {n} should be {X}?
+is this the {p} we were promised?
+@rise
+no more {ns}! no more {ns}!
+{HS}, {HS}, we will not {m}!
+hey hey, ho ho, the {x} has got to go!
+@vow
+we will {v} until the {p} is {a}.
+we will march to {l} if we have to.
+we demand {N} {ns}, and a {x}.
+@refrain
+{HS} united will never be divided!
+Power to the {HS}!
+We are the {HS}, and we will not {m}!
+@return
+and the {p} is quiet now, for a while
+@close
+Thank you. Stay {a}, {HS}.
+The protest is over. There are {xs} at the back.
+Power to the {HS}. Goodnight.
+
+@frame love letter
+@intro
+This is a love letter. It is called {T}.
+I wrote this for someone special. {T}.
+@title
+Dear {H}
+My {H}
+Sweet {H}
+@open
+Dear {H}. I fell for you {t}.
+My darling {H}, I cannot stop thinking of you.
+Dear {H}. It has been a long time.
+@image
+roses are red, {ns} are {a}
+your eyes are like two {X} {xs}
+I think of you when I eat {f}
+you make my heart go {s}
+remember {l}? remember the {xs}?
+@ask
+do you think of me, {H}?
+why did you {v} away?
+@vow
+I would {m} across {l} for you.
+I will wait for you in the {p}.
+I will love you forever, and a little after.
+@refrain
+I love you, {H}.
+Be mine, {H}.
+You are my {x}, {H}.
+@return
+it is still you, {H}. it was always you.
+@close
+Love, a {X} {x}.
+Yours forever. Write back, {H}.
+Kiss kiss. Signed, the {x}.
+
+@frame eulogy
+@intro
+A eulogy. It is called {T}.
+Please, a moment of silence. Okay. {T}.
+@title
+Farewell, {H}
+Goodbye, {H}
+So Long, {H}
+@open
+We are gathered here today to remember a {H}.
+Dearly beloved. We are here for the {H}.
+The {H} was taken from us {t}.
+@image
+the {H} loved {f} and long walks
+it never once said no to a {x}
+the {H} could {m} like nobody else
+the {H} was {a}, and never {X}
+@ask
+who will look after the {ns}?
+@vow
+we will never forget the {H}.
+we will {m} {d} in its honor.
+@refrain
+Rest in peace, {H}.
+You were a good {H}.
+Gone, but not forgotten.
+@return
+it is in a better {p} now
+I like to think it is in {l}
+@close
+Rest easy, {H}. There is {f} in the back.
+And now, a moment of silence. {s}. Thank you.
+Farewell, {H}. Goodnight.
+
+@frame award speech
+@intro
+No speech prepared. This is {T}.
+Wow. Okay. This is {T}.
+@title
+Thank You, {HS}
+This Award Is for You
+Wow, Just Wow
+@open
+Wow. I did not expect this. I am just a {H}.
+Thank you. Thank you. Please, sit down.
+First of all, this {x} is very heavy.
+@image
+I want to thank my {X} family
+I want to thank the {ns}, all {N} of them
+I could not have done it without {f}
+@ask
+mom, are you watching?
+can you believe it?
+@rise
+this is for the {HS}!
+we did it! we did it, {HS}!
+@vow
+I will put this on my {x}.
+@refrain
+Thank you!
+Thank you, {HS}!
+This is for you, {HS}!
+@close
+They are playing the music. Thank you!
+I love you all. Especially the {ns}.
+Thank you. Goodnight, {HS}!
+
+@frame nature show
+@intro
+Tonight, a nature show. {T}.
+Quiet, please. We are filming. {T}.
+@title
+Planet {H}
+Secret {HS}
+Wild {HS}
+@open
+Here, in the {p}, lives the {a} {H}.
+We have waited {N} days to film the {H}.
+Few have seen the {H} in the wild.
+@image
+the {H} prepares to {v}
+it sniffs the {n}. it is not {f}
+a rare sight: {N} {HS} at once
+the {H} hides behind a {x}
+it lives on a diet of {f}
+@ask
+will the {H} find its {n}?
+what is the {H} doing?
+@rise
+incredible! the {H} begins to {m}!
+it is {G}!
+@vow
+we must protect the {HS}.
+@refrain
+Truly, a {G} creature.
+The {H}. Simply {G}.
+Nature is {X}.
+@return
+and the {p} is quiet again
+@close
+Join us next week for the {HS} of {l}.
+And so, the {H} goes home. Goodnight.
+
+@frame sportscast
+@intro
+Live, from the big game! {T}!
+Welcome to the game, folks. {T}.
+@title
+The Big Game
+{HS} Versus All
+Final Round
+@open
+Welcome to the big game, everybody!
+What a night, folks. The {HS} are here.
+And the {HS} take the field!
+@image
+oh! a {X} move from the {H}!
+the crowd is going {X}!
+the {H} passes to {k}!
+the crowd is throwing {f}!
+@ask
+can you believe it?
+will the {H} {v}?
+what is the coach thinking?
+@rise
+it shoots! it scores!
+touchdown! goal! home run! all of them!
+{e}!
+@vow
+this one is going in the record books.
+@refrain
+What a play!
+Unbelievable!
+The {HS} win it!
+@return
+and the {p} goes quiet. what a game
+@close
+That is the game, folks! Drive safe!
+What a game. Goodnight from the {p}!
+
+@frame bedtime story
+@intro
+A bedtime story. It is called {T}.
+Get comfy. Here is {T}.
+@title
+The Little {H}
+The Brave {H}
+Goodnight, {H}
+@open
+Once upon a time, there was a little {H}.
+Long ago, in a land of {f}, lived a {H}.
+Once upon a time, in {l}, lived a {H}.
+@image
+one day, the {H} met {k}
+they had {f} for dinner, and {f} for dessert
+and the moon was {X} that night
+and the stars were made of {f}
+@ask
+and do you know what happened next?
+@rise
+and the {H} said, {e}!
+@vow
+the {H} promised to {m} every day.
+@refrain
+And they all lived happily ever after.
+Sleep tight, little {H}.
+@return
+and the {p} was quiet, and {a}
+@close
+The end. Goodnight, {H}.
+And now it is time for bed. The end.
+
+@frame pep talk
+@intro
+A pep talk. It is called {T}.
+Everybody up. This is {T}.
+@title
+You Can Do It
+Believe, {H}
+Be the {H}
+@open
+Look at me. You are a {H}. Say it with me.
+Listen up, team. Today we {v}.
+You are {G}. You are {a}. You are a {H}.
+@image
+every morning I tell the mirror: {x}
+when the {p} gets {a}, you {v} harder
+I believe in you. {k} believes in you
+you were made for {f}
+@ask
+are you ready?
+who are you? say it! a {H}!
+@rise
+believe! believe! believe!
+you can {v}! you can {m}! you can do it!
+@vow
+today, you will {v}.
+you will not give up. not {t}. not ever.
+@refrain
+You are a {H}!
+Believe in the {H}!
+You got this!
+@close
+Now get out there and {v}!
+Go team! Go {HS}!
+
+@frame complaint
+@intro
+I have a complaint. It is called {T}.
+I need to talk about something. {T}.
+@title
+Excuse Me
+One More Thing
+About the {HS}
+@open
+Okay. I need to talk about the {HS}.
+Do not get me started on {ns}.
+I have been very patient. Very patient.
+@image
+nobody told me the {n} would be {X}
+I asked for {f}. I got {xs}
+there is a {x} in my {n}. again
+@ask
+why is the {n} {X}?
+is it too much to ask for one {a} {n}?
+can I speak to the manager of the {p}?
+@rise
+unbelievable!
+every single time!
+{e}!
+@vow
+I will be writing a letter.
+I will not {v} until someone listens.
+@refrain
+And another thing.
+I am not mad. I am disappointed.
+Every. Single. Time.
+@close
+Thank you for listening. I feel better.
+And that is my complaint. Goodnight.
+
+@frame forecast
+@intro
+Here is your forecast. {T}.
+And now, the weather. {T}.
+@title
+The Five Day Forecast
+Weather Watch
+Storm Watch
+@open
+Good evening. Here is your forecast for the {p}.
+Let us look at the map. It is not good.
+Big news from the weather desk tonight.
+@image
+expect {X} skies with a chance of {xs}
+{t}, a light drizzle of {f}
+a {X} front moving in from the {p}
+@ask
+@rise
+a {G} storm of {xs}!
+stay inside! hold on to your {ns}!
+@vow
+we will keep you posted.
+@refrain
+Back to you.
+Stay {a} out there.
+@close
+And that is the weather. Bring a {x}.
+That is your forecast. Back to you.
+
+@frame cooking show
+@intro
+Welcome to the kitchen. Today: {T}.
+Cooking time! This one is {T}.
+@title
+{H} Surprise
+Grandma's {H}
+{H} for Dinner
+@open
+Hello, and welcome to the kitchen.
+Today we are making a {G} {H}.
+First, wash your hands. Then wash the {H}.
+@image
+take one {X} {n} and chop it
+add a pinch of {xs}
+stir it {d} for {N} minutes
+now add the {f}. all of it
+bake it in the {p} {t}
+@ask
+do we have any more {f}?
+@rise
+yes! yes! look at that crust!
+@vow
+I will never make {f} again.
+@refrain
+And that is how you do it.
+Mmm. {G}.
+Delicious.
+@close
+Serve it with {f}. Bon appetit.
+And there you have it. Enjoy.
+
+@wild
+x: rubber chicken, trampoline, kazoo, spork, garden gnome, disco ball, bowling ball, bagpipe, unicycle, pogo stick, lava lamp, tuba, toaster, beanbag, jelly bean, marshmallow, pineapple, sock puppet, gummy bear, corn dog, tater tot, meatball, goldfish/goldfish, hula hoop, banjo, top hat, cowboy boot, snow globe, yo-yo, harmonica, bubble wrap/bubble wrap, rubber duck, pool noodle, fanny pack, mustache, wig, kitten, waffle
+X: inflatable, sparkly, fuzzy, wobbly, jiggly, extra spicy, lukewarm, upside down, polka dot, glow in the dark, microscopic, invisible, rubbery, bedazzled, sassy, turbo, slightly damp, suspicious, gigantic, enchanted, crunchy, squishy, bouncy, sticky
+l: the moon, a bouncy castle, the dentist, a bowling alley, outer space, a hot tub, the cheese aisle, a submarine, the school bus, a volcano, the bathtub, a disco, a water park, the car wash, the North Pole, a treehouse, the attic, a cloud, the zoo
+m: wiggle, yodel, moonwalk, tap dance, sneeze, juggle, hiccup, gallop, breakdance, somersault, waddle, hula hoop, cartwheel, boogie, beatbox, tiptoe, salsa, shimmy, high five, belly flop
+k: my grandma, my uncle, a wizard, a pirate, a dentist, a mime, a lifeguard, a magician, an astronaut, a ninja, a cowboy, a mermaid, a librarian, a lumberjack, the tooth fairy, a sea captain, a goat, a raccoon, a robot, the mail carrier
+e: holy guacamole, great googly moogly, jumping jellybeans, sweet potato pie, leaping lizards, good gravy, holy moly, goodness gracious, shiver me timbers, cowabunga, wowza, yippee
+s: boing, kaboom, splat, honk, squish, kerplunk, bloop, whoosh, boop, thwack, sploosh, zoom, ding
+N: seven, eleven, one hundred, one thousand, seventeen, forty two, one million, twelve, ninety nine, three
+t: on a Tuesday, at three in the morning, during lunch, last Thursday, on my birthday, at noon, in the year three thousand, before breakfast, after bedtime
+d: majestically, dramatically, politely, sideways, secretly, very slowly, backwards, loudly, gently, furiously, awkwardly, elegantly, bravely
+g: destiny, glory, freedom, wonder, thunder, legend, promise, kingdom, triumph, mystery, courage, victory, revolution
+G: glorious, mighty, fearless, magnificent, enormous, gigantic, ancient, heroic, unbroken, eternal, legendary
+
+@topic vegetables
+H: turnip, carrot, cabbage, onion, potato/potatoes, pickle, broccoli/broccoli, radish/radishes, pumpkin, beet
+n: pea, bean, lettuce/lettuce, celery/celery, cucumber, spinach/spinach, mushroom, noodle, dumpling, pancake, waffle, pretzel, bagel, soup, gravy/gravy, ketchup/ketchup, mustard/mustard, butter/butter, cheese, spoon, pepper, tomato/tomatoes, sauce, salad
+a: crunchy, soggy, leafy, roasted, pickled, steaming, buttery, crispy, tender, salty, spicy, frozen
+p: garden, kitchen, fridge, salad bowl, soup pot, market, lunchbox, compost heap
+v: sprout, simmer, boil, wilt, crunch, ripen, grow, roast
+
+@topic city
+H: lamppost, mailbox, pigeon, sidewalk, bus stop, streetlight, fire hydrant, crosswalk, parking meter, bench/benches
+n: taxi, subway, bridge, tunnel, alley, rooftop, fountain, statue, billboard, elevator, staircase, traffic cone, siren, newspaper, hot dog, pizza, umbrella, puddle, ticket, turnstile, bicycle, sneaker
+a: rainy, crowded, honking, sleepless, neon, rusty, busy, lonely, shiny, crumbling, glittering, noisy
+p: city, town square, avenue, subway, park, rooftop, alley, plaza
+v: wait, hurry, honk, glow, commute, rumble, shine, flicker
+
+@topic trucks
+H: dump truck, tow truck, fire truck, garbage truck, forklift, bulldozer, tractor, mixer truck, snowplow, monster truck
+n: wheel, tire, engine, horn, siren, bumper, headlight, wiper, gear, brake, pedal, muffler, trailer, crane, battery/batteries, diesel/diesel, gravel/gravel, puddle, traffic cone, highway, wrench/wrenches, ladder
+a: rumbling, muddy, mighty, rusty, honking, diesel, enormous, dusty, roaring, heavy, chunky, beeping
+p: highway, junkyard, garage, gravel pit, parking lot, work site, truck stop, back road
+v: rumble, honk, haul, dump, beep, roar, push, back up
+
+@topic arcade
+H: joystick, pixel, power up, high score, cartridge, game over, extra life/extra lives, boss level, coin slot, sprite
+n: button, coin, level, robot, dragon, castle, laser, rocket, mushroom, banana, ghost, ninja, wizard, monster, treasure/treasure, checkpoint, controller, screen, princess/princesses, villain, speaker, token
+a: pixelated, flashing, bleeping, glowing, sticky, haunted, invincible, retro, turbo, flickering, eight bit, blinking
+p: arcade, basement, level one, final stage, bonus round, pizza parlor, scoreboard, console
+v: jump, blink, respawn, beep, glow, level up, power up, continue
+
+@topic animals
+H: raccoon, pigeon, goose/geese, squirrel, hedgehog, otter, llama, penguin, walrus/walruses, platypus/platypuses
+n: duck, rabbit, kitten, puppy/puppies, hamster, turtle, lobster, beaver, possum, panda, koala, moose/moose, chicken, donkey, goat, sheep/sheep, mouse/mice, frog, crab, owl
+a: fluffy, sleepy, grumpy, waddling, sneaky, hungry, tiny, enormous, curious, prickly, soggy, noble
+p: forest, pond, barnyard, trash can, burrow, river, zoo, backyard
+v: waddle, scurry, nibble, burrow, quack, snooze, hide, wander
+
+@topic stuff
+H: sock, shoelace, button, paper clip, stapler, eraser, sticker, toothbrush/toothbrushes, pencil, balloon
+n: zipper, laundry/laundry, glitter/glitter, sponge, crayon, scissors/scissors, glue stick, notebook, backpack, ruler, rubber band, candle, cupcake, blanket, pillow, mitten, umbrella, teaspoon, marble, bubble
+a: lonely, fuzzy, lost, missing, sparkly, wrinkled, tangled, glittery, squeaky, sticky, faded, forgotten
+p: laundry basket, sock drawer, junk drawer, backpack, couch cushion, dryer, desk drawer, lost and found
+v: vanish, tumble, wait, sparkle, squeak, unravel, wander, hide
+
+@topic space
+H: astronaut, rocket, comet, moon rock, satellite, space suit, meteor, alien, planet, star
+n: crater, galaxy/galaxies, asteroid, launch pad, telescope, helmet, orbit, nebula, moon, sun, spaceship, gravity/gravity, countdown, ray gun, black hole, space station, robot, star map, jet pack, flying saucer
+a: cosmic, weightless, distant, twinkling, frozen, shiny, silent, orbiting, lunar, stellar, faraway, blinking
+p: space station, moon base, launch pad, outer space, Milky Way, rocket ship, crater, asteroid belt
+v: orbit, launch, float, twinkle, blast off, zoom, drift, land
+
+@topic dinosaurs
+H: dinosaur, triceratops/triceratops, stegosaurus/stegosauruses, raptor, pterodactyl, brontosaurus/brontosauruses, fossil, dino egg, T rex/T rexes, velociraptor
+n: tooth/teeth, claw, tail, egg, bone, volcano/volcanoes, swamp, fern, footprint, meteor, roar, nest, spike, museum, skeleton, jungle, tar pit, cave, boulder, leaf/leaves
+a: prehistoric, ancient, stomping, roaring, enormous, scaly, extinct, toothy, mighty, rumbling, spiky, hungry
+p: jungle, swamp, volcano, museum, tar pit, valley, cave, backyard
+v: stomp, roar, hatch, chomp, rumble, hunt, rampage, graze
+
+@topic school
+H: pencil sharpener, lunch tray, hall pass, backpack, chalkboard, homework, school bus, desk, glue stick, recess bell
+n: crayon, eraser, ruler, notebook, quiz/quizzes, field trip, locker, cafeteria, gym class, spelling test, lunchbox, juice box, recess, globe, textbook, hamster, art project, permission slip, fire drill, lunch line
+a: sharpened, overdue, sticky, squeaky, dusty, gold star, tardy, quiet, messy, crumpled, smart, brand new
+p: classroom, cafeteria, hallway, playground, library, gym, school bus, principal's office
+v: study, raise a hand, line up, recess, doodle, spell, sharpen, pass notes
+
+@topic ocean
+H: jellyfish/jellyfish, octopus/octopuses, seagull, lobster, starfish/starfish, sea turtle, crab, dolphin, whale, clam
+n: wave, shell, sandcastle, seaweed/seaweed, coral/coral, anchor, submarine, pearl, shark, bubble, tide, beach towel, sunscreen/sunscreen, surfboard, lighthouse, treasure chest, flip flop, sea horse, sand dollar, buoy
+a: salty, sandy, soggy, wavy, sparkling, deep, slippery, sunburned, glittering, briny, foamy, bubbly
+p: ocean, beach, tide pool, coral reef, sea floor, lighthouse, pier, sandbar
+v: splash, swim, float, surf, wiggle, drift, glimmer, bubble
+
+@topic breakfast
+H: pancake, waffle, bagel, donut, toaster, cereal bowl, egg, muffin, frying pan, orange juice
+n: syrup/syrup, butter/butter, bacon/bacon, toast/toast, jam, spoon, milk/milk, banana, blueberry/blueberries, cinnamon/cinnamon, sprinkle, cereal/cereal, coffee mug, omelet, sausage, yogurt, granola/granola, napkin, plate, fork
+a: fluffy, toasty, sticky, golden, syrupy, crispy, soggy, buttery, warm, sleepy, sugary, crunchy
+p: kitchen, diner, breakfast table, toaster, frying pan, cereal box, fridge, griddle
+v: flip, toast, pour, sizzle, crunch, drizzle, butter, wake up
+
+@topic camping
+H: tent, marshmallow, campfire, sleeping bag, flashlight, canoe, compass, lantern, backpack, hiking boot
+n: tree, pine cone, log, mosquito/mosquitoes, trail, map, bear, owl, star, stick, hot dog, s'more, raccoon, river, rock, rain, cooler, bug spray/bug spray, kayak, canteen
+a: muddy, smoky, cozy, starry, chilly, rustling, toasty, buggy, damp, wild, quiet, crackling
+p: forest, campsite, mountain, trail, lake, cabin, riverbank, tent
+v: hike, paddle, roast, toast, wander, howl, crackle, snore
+
+@topic pirates
+H: pirate, parrot, treasure chest, pirate ship, eye patch, peg leg, cannon, plank, anchor, captain
+n: map, coin, island, sword, flag, barrel, rope, sail, telescope, rowboat, shark, storm, wave, crab, skull, crew, treasure/treasure, jewel, bottle, compass
+a: salty, sneaky, swashbuckling, golden, soggy, stormy, shiny, rusty, rickety, buried, mysterious, scurvy
+p: high seas, island, crow's nest, beach, shipwreck, lagoon, tavern, treasure cave
+v: sail, plunder, dig, swab, sing, row, swashbuckle, search
+
+@topic bugs
+H: ladybug, beetle, caterpillar, butterfly/butterflies, grasshopper, ant, firefly/fireflies, bumblebee, snail, worm
+n: leaf/leaves, flower, web, cocoon, puddle, twig, mushroom, petal, honey/honey, anthill, dewdrop, pebble, stem, picnic, crumb, acorn, garden hose, dandelion, log, mud/mud
+a: tiny, buzzing, crawly, wiggly, fuzzy, spotted, glowing, slimy, busy, crunchy, itty bitty, twitchy
+p: garden, picnic basket, flower bed, mud puddle, backyard, anthill, compost heap, windowsill
+v: buzz, crawl, wiggle, flutter, glow, nibble, scurry, hum
+
+@core food
+spaghetti, meatloaf, pudding, nachos, mashed potatoes, fish sticks, cheese puffs, applesauce, peanut butter,
+creamed corn, cold pizza, jelly, pancakes, tacos, broccoli, oatmeal, popcorn, soup, waffles, french toast, bagels,
+meatballs, lasagna, burritos, dumplings, noodles, ramen, sushi, cornbread, biscuits, gravy, mac and cheese,
+grilled cheese, chicken nuggets, hot dogs, hamburgers, pickles, coleslaw, potato salad, baked beans, chili,
+fruit salad, cupcakes, brownies, cookies, muffins, cinnamon rolls, donuts, pretzels, crackers, cheese, yogurt,
+granola, cereal, toast, scrambled eggs, bacon, sausages, hash browns, ketchup, mustard, salsa, guacamole, hummus,
+carrot sticks, celery, apples, bananas, grapes, strawberries, blueberries, watermelon, pineapple, mangoes, peaches,
+cherries, lemons, limes, coconuts, raisins, peanuts, almonds, marshmallows, chocolate milk, lemonade, smoothies,
+milkshakes, ice cream, frozen yogurt, popsicles, jelly beans, gumdrops, licorice, cotton candy, caramel, fudge,
+tapioca, rice pudding, corn dogs, egg rolls
+
+@core tools
+hammers, wrenches, screwdrivers, pliers, duct tape, sandpaper, nails, bolts, power drills, tape measures, crowbars,
+paint rollers, zip ties, rubber mallets, hacksaws, glue guns, socket sets, toolboxes, chisels, files, clamps, vises,
+levels, rulers, squares, saws, jigsaws, sanders, routers, drill bits, nuts, washers, screws, hinges, staples,
+staple guns, tacks, rivets, rivet guns, soldering irons, wire cutters, wire strippers, box cutters, utility knives,
+putty knives, paint brushes, paint cans, drop cloths, ladders, step stools, sawhorses, workbenches, shovels, rakes,
+hoes, trowels, wheelbarrows, garden hoses, pruning shears, hedge trimmers, leaf blowers, lawn mowers, pickaxes,
+sledgehammers, mallets, axes, hatchets, flashlights, headlamps, extension cords, power strips, batteries,
+multimeters, stud finders, spirit levels, plumb lines, chalk lines, pencils, carpenter's pencils, safety goggles,
+ear muffs, work gloves, hard hats, tool belts, pegboards, toolbags, magnets, funnels, oil cans, grease guns,
+plungers, pipe wrenches, allen keys, sockets, ratchets, torque wrenches, jumper cables, tire gauges, bungee cords,
+rope
+
+@core gadgets
+resistors, capacitors, circuit boards, microchips, cables, batteries, antennas, transistors, light bulbs,
+motherboards, solder, fuses, switches, speakers, magnets, copper wire, hard drives, diodes, light emitting diodes,
+buttons, knobs, sliders, dials, keyboards, mice, joysticks, touch screens, microphones, headphones, earbuds, webcams,
+routers, modems, servers, laptops, tablets, phones, smart watches, calculators, printers, scanners, projectors,
+remote controls, chargers, power cords, adapters, plugs, sockets, outlets, relays, motors, servos, fans, heat sinks,
+processors, memory sticks, flash drives, floppy disks, cassettes, records, vacuum tubes, coils, crystals,
+oscillators, amplifiers, synthesizers, drum machines, sensors, thermostats, timers, alarm clocks, robots, drones,
+satellites, radios, walkie talkies, televisions, monitors, pixels, lasers, barcodes, keypads, doorbells,
+smoke alarms, flashlights, solar panels, wind turbines, gears, pulleys, springs, levers, bolts, wires, breadboards,
+jumper wires, battery packs, toasters, blenders, microwaves, dishwashers
+
+@core astronomy
+comets, black holes, nebulas, asteroids, moon dust, stardust, galaxies, quasars, solar flares, meteor showers,
+constellations, supernovas, space rocks, red giants, planets, wormholes, gamma rays, northern lights, moons, stars,
+suns, white dwarfs, neutron stars, pulsars, brown dwarfs, exoplanets, gas giants, dwarf planets, meteorites, meteors,
+shooting stars, star clusters, the Milky Way, Andromeda, Orion, the Big Dipper, the Little Dipper, Saturn's rings,
+Jupiter's moons, the Red Spot, Mars rocks, craters, lunar eclipses, solar eclipses, sunspots, cosmic rays,
+radio waves, light years, telescopes, observatories, star charts, space probes, rovers, rockets, space suits,
+space stations, orbits, gravity, zero gravity, comet tails, the asteroid belt, the Kuiper belt, the Oort cloud,
+the Big Bang, dark matter, space dust, starlight, moonlight, twilight, the morning star, the evening star,
+the North Star, the zodiac, the equinox, the solstice, half moons, full moons, new moons, crescent moons, blue moons,
+harvest moons, star nurseries, cosmic dust, solar wind, plasma, magnetic storms, auroras, space junk, satellites,
+deep space, nova blasts, star maps, planetariums, astronauts, cosmonauts, moon boots, meteor dust, star trails,
+moon craters, rocket fuel
+
+@core chemistry
+test tubes, beakers, bubbling potions, baking soda, vinegar, molecules, atoms, helium, lab goggles, sodium, slime,
+crystals, carbon, protons, electrons, foam, rubber gloves, Bunsen burners, neutrons, hydrogen, oxygen, nitrogen,
+neon, argon, iron, copper, silver, gold, tin, zinc, aluminum, calcium, potassium, magnesium, sulfur, phosphorus,
+iodine, chlorine, silicon, lithium, mercury, nickel, cobalt, titanium, radium, salt, sugar, starch, acids, bases,
+alkalis, litmus paper, pipettes, flasks, funnels, droppers, graduated cylinders, petri dishes, microscopes,
+lab coats, safety goggles, periodic tables, formulas, equations, reactions, explosions, fizz, bubbles, steam, vapor,
+gas, liquids, solids, plasma, ice crystals, dry ice, lava lamps, glow sticks, polymers, plastics, rubber, nylon,
+soap, bleach, ammonia, peroxide, citric acid, rust, crystals of salt, rock candy, food coloring, invisible ink,
+elephant toothpaste, volcano kits, catalysts, isotopes, ions, compounds, mixtures, solutions
+
+@core flora
+daisies, tulips, ferns, sunflowers, cactuses, moss, pine needles, dandelions, seaweed, mushrooms, roses, clovers,
+bamboo, ivy, acorns, petals, orchids, lily pads, lilies, lilacs, lavender, violets, pansies, peonies, poppies,
+marigolds, daffodils, irises, carnations, chrysanthemums, hydrangeas, magnolias, cherry blossoms, apple blossoms,
+oak trees, maple trees, pine trees, palm trees, willow trees, birch trees, redwoods, sequoias, cedars, spruces, firs,
+elms, ash trees, baobabs, bonsai trees, shrubs, hedges, bushes, vines, grapevines, creepers, weeds, wheat, oats,
+barley, corn stalks, reeds, cattails, rushes, water lilies, lotus flowers, algae, lichen, toadstools, pine cones,
+seeds, sprouts, saplings, seedlings, bulbs, roots, stems, leaves, branches, twigs, bark, thorns, buds, blossoms,
+pollen, nectar, sap, berries, holly, mistletoe, four leaf clovers, snapdragons, foxgloves, bluebells, buttercups,
+forget me nots, honeysuckle, jasmine, gardenias, begonias, geraniums
+
+@core fauna
+hamsters, penguins, llamas, wombats, otters, sloths, puffins, ferrets, alpacas, pandas, badgers, guinea pigs,
+flamingos, hedgehogs, lemurs, armadillos, narwhals, raccoons, kangaroos, koalas, giraffes, zebras, elephants, hippos,
+rhinos, lions, tigers, leopards, cheetahs, jaguars, bears, polar bears, wolves, foxes, deer, moose, elk, bison,
+camels, horses, ponies, donkeys, goats, sheep, cows, pigs, chickens, ducks, geese, turkeys, swans, owls, eagles,
+hawks, falcons, parrots, toucans, peacocks, pelicans, seagulls, pigeons, robins, bluejays, hummingbirds, woodpeckers,
+ostriches, emus, frogs, toads, salamanders, turtles, tortoises, lizards, iguanas, geckos, chameleons, snakes,
+crocodiles, alligators, dolphins, whales, seals, walruses, octopuses, squids, jellyfish, crabs, lobsters, shrimp,
+starfish, sea horses, beavers, squirrels, chipmunks, rabbits, moles, bats, monkeys, gorillas, meerkats
+
+@core nautical
+anchors, life jackets, rope knots, portholes, seagulls, barnacles, lighthouses, buoys, sea shanties, captain's hats,
+fishing nets, sailboats, oars, compasses, tugboats, deck chairs, rowboats, ship's bells, sails, masts, rudders,
+hulls, keels, decks, cabins, galleys, bunks, hammocks, crow's nests, gangplanks, ladders, lifeboats, life rings,
+rope ladders, cargo crates, barrels, nets, harpoons, fishing rods, lures, bait, tackle boxes, spyglasses, telescopes,
+sextants, maps, charts, ship's wheels, helms, bows, sterns, port sides, starboard sides, waves, tides, currents,
+sea spray, sea foam, salt water, sea breezes, storms, fog horns, lanterns, signal flags, flares, radios, sonar,
+submarines, ferries, yachts, canoes, kayaks, rafts, schooners, galleons, frigates, steamboats, paddle boats,
+fishing boats, cruise ships, pirate ships, docks, piers, harbors, marinas, ports, moorings, ropes, cleats, knots,
+sailors, captains, deckhands, first mates, lookouts, mermaids, sea monsters, treasure maps, message bottles,
+deck mops

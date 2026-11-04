@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 // The companion page: bring a karaoke song in, keep songs on the FM-1, install the firmware.
 import {readMidi} from './karaoke.mjs?v=1.0.6';
+import {findKey, NOTE_NAMES, SCALE_NAMES} from './keyfind.mjs?v=1.1.0';
 import {planKaraoke} from './onboarding.mjs?v=1.0.6';
-import {songFromModel, songBytes7, decodeSong7} from './song7.mjs?v=1.0.6';
-import {Device} from './protocol.mjs?v=1.0.6';
+import {songFromModel, songBytes, songCurrent} from './song8.mjs?v=1.1.0';
+import {Device} from './protocol.mjs?v=1.1.0';
 import {Engine} from './singing.mjs?v=1.0.6';
 import {Updater, IS_OTA, PRESET_PORTS, setTrace} from './firmware-update.mjs?v=1.0.6';
 import {pickPort, remember, rememberedNames, portNames} from './ports.mjs?v=1.0.6';
@@ -174,11 +175,15 @@ async function loadLibrary() {
 }
 
 function changeText(c) {
-  return c.kind === 'put' ? `will become ${c.name}` : c.kind === 'download' ? 'will be downloaded' : 'will be deleted';
+  return c.kind === 'put' ? `will become ${c.name}${c.key ? `, in ${NOTE_NAMES[c.key.root]} ${SCALE_NAMES[c.key.scale]}` : ''}`
+    : c.kind === 'download' ? 'will be downloaded'
+    : c.kind === 'update' ? 'will be updated for 386DX 1.1' : 'will be deleted';
 }
 
 async function listSlots() {
   slotList = (await device.catalog()).filter(s => s.index < 8);
+  for (const s of slotList)                     /* 1.0's songs: their update is offered, one Sync away */
+    if (s.kind === 3 && !pending.has(s.index)) pending.set(s.index, {kind: 'update'});
   drawSlots();
 }
 
@@ -194,7 +199,8 @@ function drawSlots() {
     const pick = document.createElement('select');
     pick.setAttribute('aria-label', `Change for S${s.index + 1}`);
     pick.append(new Option('No change', ''));
-    if (s.kind === 1) pick.append(new Option('Download it', 'download'), new Option('Delete it', 'delete'));
+    if (s.kind === 3) pick.append(new Option('Update it', 'update'));
+    if (s.kind === 1 || s.kind === 3) pick.append(new Option('Download it', 'download'), new Option('Delete it', 'delete'));
     const ours = document.createElement('optgroup');
     ours.label = 'Put a song here';
     ours.append(...library.map((e, i) => new Option(e.name, `l${i}`)), new Option('Import a file…', 'import'));
@@ -216,7 +222,7 @@ function drawSlots() {
 function choose(slot, value) {
   if (value === 'import') return importFor(slot);
   if (!value) pending.delete(slot);
-  else if (value === 'download' || value === 'delete') pending.set(slot, {kind: value});
+  else if (value === 'download' || value === 'delete' || value === 'update') pending.set(slot, {kind: value});
   else if (value[0] === 'l') {
     const e = library[Number(value.slice(1))];
     pending.set(slot, {kind: 'put', name: e.deviceName || e.name, from: {library: Number(value.slice(1))}});
@@ -224,34 +230,61 @@ function choose(slot, value) {
   drawSlots();
 }
 
-// the import dialog: the format explained, a file chosen for this slot
+// the import dialog: the format explained, a file chosen for this slot; its key found, to keep or change
 function importFor(slot) {
-  const dialog = $('import-dialog'), input = $('import-file');
+  const dialog = $('import-dialog'), input = $('import-file'), root = $('import-root'), scale = $('import-scale');
+  if (!root.options.length) {
+    root.append(...NOTE_NAMES.map((n, i) => new Option(n, i)));
+    scale.append(...SCALE_NAMES.map((n, i) => new Option(n, i)));
+  }
   input.value = '';
+  $('import-key').hidden = true;
+  let file = null;
   input.onchange = async () => {
     const f = input.files[0];
     if (!f) return;
-    pending.set(slot, {kind: 'put', name: f.name.replace(/\.(kar|midi?)$/i, ''), from: {data: await f.arrayBuffer()}});
-    dialog.close('file');
+    const data = await f.arrayBuffer();
+    let key;
+    try {
+      key = findKey(readMidi(data).tracks);
+    } catch (e) {
+      say('import-found', e.message);
+      $('import-key').hidden = false;
+      return;
+    }
+    file = {name: f.name.replace(/\.(kar|midi?)$/i, ''), data};
+    root.value = key.root;
+    scale.value = key.scale;
+    say('import-found', key.sure > 0.6 ? `It sounds like ${key.name}.` : `It may be in ${key.name}: the notes don't say clearly.`);
+    $('import-key').hidden = false;
   };
-  dialog.addEventListener('close', () => drawSlots(), {once: true});
+  dialog.addEventListener('close', () => {
+    if (dialog.returnValue === 'add' && file)
+      pending.set(slot, {kind: 'put', name: file.name, from: {data: file.data},
+                         key: {root: Number(root.value), scale: Number(scale.value)}});
+    drawSlots();
+  }, {once: true});
   dialog.returnValue = '';
   dialog.showModal();
 }
 
 // a karaoke or MIDI file made into a 386DX song: the tune and words found, every syllable checked
-async function makeSong(data, name, melody) {
+async function makeSong(data, name, melody, key) {
   const m = readMidi(data);
   if (melody !== undefined) m.melody = melody;
   const notes = m.tracks[m.melody].notes, lo = Math.min(...notes.map(n => n.note)), hi = Math.max(...notes.map(n => n.note));
-  const transpose = Math.max(36 - lo, Math.min(84 - hi, Math.round((60 - (lo + hi) / 2) / 12) * 12));
+  let transpose = Math.round((60 - (lo + hi) / 2) / 12) * 12;  /* (whole octaves: the tune stays in the band's key) */
+  while (lo + transpose < 36 && hi + transpose + 12 <= 84) transpose += 12;
+  while (hi + transpose > 84 && lo + transpose - 12 >= 36) transpose -= 12;
+  if (lo + transpose < 36 || hi + transpose > 84) transpose = Math.max(36 - lo, Math.min(84 - hi, transpose));   /* (too wide) */
   const assignments = Object.fromEntries(m.tracks.filter(t => t.notes.length).map(t => [t.id, t.id === m.melody ? 'omit'
     : t.notes.every(n => n.channel === 9) ? 'drums' : /bass|contra/i.test(t.name) || t.notes.reduce((s, n) => s + n.note, 0) / t.notes.length < 48 ? 'bass' : 'melody']));
   const plan = planKaraoke(m, {lyric: m.lyric, melody: m.melody, transpose, compress: true, ornaments: true, assignments,
     name: (name || m.title || 'Song').slice(0, 23)});
   if (plan.errors.length) throw Error(`${name}: ${plan.errors.join(' ')}`);
-  const checked = await engine.check(plan.parts[0], true, false);
-  return songBytes7(songFromModel(checked));
+  const checked = await engine.check(plan.parts[0], true, false), song = songFromModel(checked);
+  const k = key || findKey(m.tracks);                /* the key: as the dialog left it, else found */
+  return songBytes({...song, root: k.root, scale: k.scale});
 }
 
 function save(name, data) {
@@ -271,16 +304,18 @@ async function sync() {
       const s = slotList.find(x => x.index === slot);
       if (c.kind === 'download') {
         step(`Downloading S${slot + 1}`);
-        const data = await device.readSlot(slot);
-        decodeSong7(data);
+        const data = songCurrent(await device.readSlot(slot));     /* a 1.0 song comes down updated */
         save(`${s?.name || 'song'}.386dx`, data);
+      } else if (c.kind === 'update') {
+        step(`Updating S${slot + 1}`);
+        await device.sendSong(slot, songCurrent(await device.readSlot(slot)));
       } else if (c.kind === 'delete') {
         step(`Emptying S${slot + 1}`);
         await device.deleteSlot(slot);
       } else {
         step(`${c.name}: checking every syllable`);
         const bytes = await makeSong(c.from.data ?? await (await fetch(library[c.from.library].source)).arrayBuffer(),
-          c.name, c.from.data ? undefined : library[c.from.library].melody);
+          c.name, c.from.data ? undefined : library[c.from.library].melody, c.key);
         step(`${c.name}: sending to S${slot + 1}`);
         await device.sendSong(slot, bytes);
       }

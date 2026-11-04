@@ -1,0 +1,52 @@
+foreign
+# the Phrase: a note stretched writes over the ones it covers; DELETE NOTE; HOME + a page's button goes a layer on
+tap SAVE
+tap SEL
+turn SELECT 1
+tap SEL
+expect page Phrase
+key 7
+key 9
+key 11
+key 12
+expect notes 4
+turn SELECT -4
+keydown 7
+turn SELECT 3
+keyup 7
+expect notes 1
+# SEL: EDIT WORDS, DELETE NOTE (the cursor is on the note)
+tap SEL
+turn SELECT 1
+tap SEL
+expect msg NOTE DELETED
+expect notes 0
+# the layers: Karaoke's banks, the mixer's levels, sends; a page with one says so
+tap FX
+expect layer 0
+down HOME
+tap FX
+up HOME
+expect layer 1
+expect page Karaoke
+down HOME
+tap FX
+up HOME
+expect layer 2
+# the button alone, where you are, keeps the layer (it is held for its help)
+tap FX
+expect layer 2
+tap LFO
+down HOME
+tap LFO
+up HOME
+expect layer 1
+tap GLO
+down HOME
+tap GLO
+up HOME
+expect msg ONE LAYER
+expect page Setup
+# HOME alone still goes to Sing
+tap HOME
+expect page Sing

@@ -25,6 +25,12 @@ extern volatile int8_t eng_sing_clip;         /* the clip playing, -1 none */
 extern volatile uint8_t eng_meter[4];         /* each track's level, 0..127 */
 extern volatile uint16_t eng_drum_hits;       /* drum lanes struck since the main loop last cleared it */
 extern volatile uint32_t eng_punch;           /* the punch-in effects held, a bit each */
+extern volatile uint8_t eng_duck;             /* the pump's duck now, 0..127 */
+extern volatile uint8_t eng_gate;             /* the chops' gate now, 0 shut .. 127 open */
+extern volatile uint8_t eng_build;            /* build's riser now, 0..127 */
+extern volatile uint8_t eng_build_mask;       /* the tracks build picked this time, a bit a track */
+extern volatile uint8_t eng_reps;             /* a brrr's repeats so far (counts round) */
+extern volatile uint8_t eng_look[4];          /* SLAMJAM: the wah's sweep, the echo, the scratch's place, the horn */
 
 void engine_init(void);
 /* the song was loaded or rebuilt: every sound from its tracks (stopped) */
@@ -41,10 +47,13 @@ void engine_off(unsigned track, unsigned note);
 /* the Voice keys: sing clip `id` (vocal.h) at `note` while held, or a hummed guide if it isn't ready */
 void engine_sing(unsigned note, unsigned velocity, uint16_t id);
 void engine_sing_off(unsigned note);
+/* a note just written, heard for ms whatever its key does (the Voice: sung, clip `id` if it is ready) */
+void engine_preview(unsigned track, unsigned note, unsigned velocity, uint16_t id, unsigned ms);
 /* hum `note` for `ms` (a pitch guide while entering notes) */
 void engine_guide(unsigned note, unsigned ms);
 /* punch-in effects: k 0..15 held or let go */
 void engine_punch(unsigned k, int on);
+void engine_octave(unsigned track, int octave);     /* Keys, Bass, Drums: the whole track, -2..2 octaves */
 void engine_tap(void);                        /* the click while recording (one tick of the metronome) */
 /* the overload guard (main loop): fewer synth voices while the audio's load is over 85 % */
 void engine_guard(unsigned load_pct, uint32_t now_ms);
@@ -53,3 +62,9 @@ extern volatile uint8_t eng_guard;
 int engine_clip_queued(unsigned clip);        /* a queued command still names this clip */
 /* one block, n <= 256 frames, interleaved stereo int32 (24-bit) */
 void engine_render(int32_t *out, uint32_t n);
+void engine_hush(int on);             /* the song's sung words kept quiet (SLAMJAM outside its room) */
+void engine_poetry(int on);           /* SLAMJAM (GLO): its snaps and its punch-ins */
+
+/* the arpeggiator's order: which of n notes (low to high, every octave of the range) plays i-th, for a type
+ * (song.h ARP_*); seed carries the random type's state */
+unsigned arp_order(unsigned type, unsigned n, unsigned i, uint32_t *seed);

@@ -46,7 +46,7 @@ FPU = ["-mcpu=r3", "-mfprev1", "-ffp-contract=off"]
 # the DSP, the sequencer and the audio engine: separate units at -O2
 from music_sources import MUSIC_UNITS
 O2_UNITS = ["app/engine.c", "app/punch.c", "app/vocal.c", "app/song.c", "app/factory.c", "app/speech.c",
-            "app/speech_runtime.c", "app/singing.c"] + MUSIC_UNITS
+            "app/speech_runtime.c", "app/singing.c", "dsp/music.c"]   # dsp/music.c: MUSIC_UNITS as one unit
 LINE = re.compile(r"^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2} )+)\s*\t(.*)$")
 
 # SDK files of AC79NN_SDK_V1.2.1_2023-12-13 (the tested version)
@@ -57,10 +57,12 @@ SDK_SHA256 = {
 }
 
 def build_version():
-    """The commit, and when the tree has uncommitted changes a fingerprint of them: 0801c41+3fa2b9."""
+    """The commit, and when what the build reads has uncommitted changes a fingerprint of them: 0801c41+3fa2b9.
+    Files outside the build's inputs (songs and recordings kept beside the code) leave it clean."""
     git = lambda *a: subprocess.run(["git", *a], cwd=SRC, capture_output=True).stdout
     head = git("rev-parse", "--short=7", "HEAD").decode().strip() or "nogit"
-    changes = git("diff", "HEAD") + git("ls-files", "--others", "--exclude-standard", "-z")
+    inputs = ["firmware", "assets", "tools", "host", "LICENSES", "LICENSING.md", "BUILDING.md", "LICENSE"]
+    changes = git("diff", "HEAD", "--", *inputs) + git("ls-files", "--others", "--exclude-standard", "-z", "--", *inputs)
     return head + ("+" + hashlib.sha1(changes).hexdigest()[:6] if changes.strip() else "")
 
 
@@ -145,6 +147,8 @@ def tc_all(*cmds):
 def generate():
     GEN.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable, str(SRC/"tools/gen_font.py"), str(GEN/"felucca_font.h")], check=True)
+    subprocess.run([sys.executable, str(SRC/"tools/gen_cards.py"), str(GEN/"cards.h")], check=True)
+    subprocess.run([sys.executable, str(SRC/"tools/gen_poem.py"), str(GEN/"poem_data.h")], check=True)
     subprocess.run([sys.executable,str(SRC/'tools/gen_songs.py')],check=True)
     subprocess.run([sys.executable,str(SRC/'tools/gen_wavetables.py'),str(GEN/'wavetables.h')],check=True)
     from prepare_espeak import prepare
@@ -247,7 +251,7 @@ def build_app():
     tc_all(*units)
     # Speech preparation may allocate and use software double. The render
     # objects must never acquire those dependencies.
-    for obj in (OUT/"o2/app_engine.o", OUT/"o2/app_punch.o", OUT/"o2/dsp_synth.o", OUT/"o2/dsp_drumkit.o", OUT/"o2/dsp_fxunit.o"):
+    for obj in (OUT/"o2/app_engine.o", OUT/"o2/app_punch.o", OUT/"o2/dsp_music.o"):
         table = tc("common/bin/objdump", "-t", obj)
         undefined = [line.split()[-1] for line in table.splitlines()
                      if "*UND*" in line and line.split()[-1] != "00000000"]

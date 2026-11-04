@@ -87,7 +87,7 @@ def prepare(root):
     rev=subprocess.check_output(['git','-C',str(upstream),'rev-parse','HEAD'],text=True).strip()
     if rev!=REVISION:raise SystemExit('eSpeak NG revision mismatch')
     native=root/'build/espeak-tools'; out=root/'build/espeak';out.mkdir(parents=True,exist_ok=True)
-    fingerprint=hashlib.sha256(Path(__file__).read_bytes()+REVISION.encode()).hexdigest()
+    fingerprint=hashlib.sha256(Path(__file__).read_bytes()+(root/'tools/espeak_prune.txt').read_bytes()+REVISION.encode()).hexdigest()
     stamp=out/'data.stamp'
     if not (out/'data.c').exists() or not stamp.exists() or stamp.read_text()!=fingerprint:
         (out/'unicode.c').unlink(missing_ok=True)
@@ -97,6 +97,11 @@ def prepare(root):
         shutil.copytree(upstream/'phsource',ph,dirs_exist_ok=True)
         data.mkdir(parents=True,exist_ok=True); dct.mkdir(exist_ok=True)
         s=(ph/'phonemes').read_text();(ph/'phonemes').write_text(s[:s.index('phonemetable consonants')]+ '\nphonemetable en base1\ninclude ph_english\nphonemetable en-us en\ninclude ph_english_us\n')
+        # leave out the phonemes a US-English voice never speaks (tools/espeak_prune.txt): their sound data goes with them
+        prune={l.strip() for l in (root/'tools/espeak_prune.txt').read_text().splitlines() if l.strip() and not l.startswith('#')}
+        for f in ('phonemes','ph_english','ph_english_us'):
+            t=(ph/f).read_text(encoding='utf8')
+            (ph/f).write_text(re.sub(r'^phoneme\s+(\S+)(.*?)^endphoneme\n?',lambda m:'' if m.group(1).replace('\\','') in prune else m.group(0),t,flags=re.S|re.M),encoding='utf8')
         compiler=out/'compile.c'
         compiler.write_text('#include <espeak-ng/espeak_ng.h>\n#include <stdio.h>\nint main(int n,char **v){espeak_ng_ERROR_CONTEXT e=0;espeak_ng_InitializePath(v[1]);int r=espeak_ng_CompileIntonation(stdout,&e);if(!r)r=espeak_ng_CompilePhonemeDataPath(22050,v[2],0,stdout,&e);if(r)espeak_ng_PrintStatusCodeMessage(r,stderr,e);return !!r;}\n')
         subprocess.run(['cc','-I'+str(upstream/'src/include'),str(compiler),str(native/'src/libespeak-ng/libespeak-ng.a'),str(native/'src/ucd-tools/libucd.a'),'-lm','-o',str(out/'compile')],check=True)
@@ -107,6 +112,9 @@ def prepare(root):
         subprocess.run([str(native/'src/espeak-ng'),'--compile=en'],cwd=dct,env=env,check=True)
         voice=(upstream/'espeak-ng-data/lang/gmw/en-US').read_bytes()+b'\nklatt 1\n'
         assets={n:(data/n).read_bytes() for n in ('phondata','phonindex','phontab','intonations','en_dict')};assets['klatt-en']=voice
+        # the English-only table ends on the glottal stop's program, whose last instruction the interpreter reads one
+        # word past ("button", "kitten"): a word of 0 after it, so that read stays inside the asset
+        assets['phonindex']+=b'\0\0\0\0'
         c=['/* Generated from eSpeak NG 1.52.0; GPL-3.0-or-later. */','#include <stddef.h>','#include <string.h>']
         for n,b in assets.items():
             name=n.replace('-','_');c.append(f'static const unsigned char {name}[] __attribute__((aligned(4))) = {{')
@@ -175,6 +183,12 @@ int main(void){puts("/* eSpeak UCD subset; GPL-3.0-or-later. */\n#include <ucd/u
     p=src/'synthesize.c';s=p.read_text().replace('PHONEME_LIST phoneme_list[N_PHONEME_LIST+1];','PHONEME_LIST phoneme_list[N_PHONEME_LIST+1] ES_POOL;');p.write_text(s)
     p=src/'soundicon.c';s=p.read_text();s=replace_function(s,'static espeak_ng_STATUS LoadSoundFile(', '(void)fname;(void)index;(void)context;return ENOENT;');p.write_text(s)
     # The panel supplies plain text, never SSML or external audio references.
+    # The English voice reads ISO-8859-1 or UTF-8: the other code pages' tables are left out of the flash.
+    p=src/'encoding.c';s=p.read_text()
+    for cp in [f'ISO_8859_{n}' for n in (2,3,4,5,6,7,8,9,10,11,13,14,15,16)]+['KOI8_R','ISCII']:
+        assert '{ string_decoder_getc_codepage, '+cp+' }' in s
+        s=s.replace('{ string_decoder_getc_codepage, '+cp+' }','{ string_decoder_getc_codepage, ISO_8859_1 }')
+    p.write_text(s)
     p=src/'ssml.c';s=p.read_text();s=replace_function(s,'int ProcessSsmlTag(', 'return 0; /* SSML is not enabled in this instrument. */');p.write_text(s)
     # Lyrics spell their numbers out; a digit left in one is read digit by digit (the flash this saves
     # holds the instrument's synth). Roman numerals are read as words.
@@ -270,7 +284,101 @@ int main(void){puts("/* eSpeak UCD subset; GPL-3.0-or-later. */\n#include <ucd/u
     p=src/'wavegen.c';s=p.read_text()
     s=s.replace('Wavegen(length & 0xffff, q[1] >> 16,','Wavegen(length & 0x1ffff, q[1] >> 17,')
     s=s.replace('Wavegen_Klatt(length & 0xffff,','Wavegen_Klatt(length & 0x1ffff,');p.write_text(s)
+    pack_speech(src, upstream)
     return [src/(n+'.c') for n in UNITS]+[out/'data.c']+[uc,upstream/'src/ucd-tools/src/ctype.c']
+
+
+def pack_speech(src, upstream):
+    """The English voice's sine table is a quarter wave, exactly. The other alphabets are never named."""
+    import re
+    tab = (upstream/'src/libespeak-ng/sintab.h').read_text()
+    body = tab.split('sin_tab[2048] = {', 1)[1].split('};', 1)[0]
+    nums = [int(x) for x in re.findall(r'-?\d+', body)]
+    assert len(nums) == 2048
+    q = nums[:513]
+    for i in range(2048):
+        k = i & 1023
+        if k > 512:
+            k = 1024 - k
+        s = q[k]
+        if i & 1024:
+            s = -s
+        assert s == nums[i]
+    lines = ['/* Quarter of sintab.h. The other three quadrants fold back exactly. */',
+             'static const short sin_q[513] = {']
+    for i in range(0, 513, 8):
+        lines.append('\t' + ', '.join(str(n) for n in q[i:i+8]) + ',')
+    lines.append('};')
+    lines.append('static inline __attribute__((always_inline)) short quarter_sin(unsigned short theta) {')
+    lines.append('\tunsigned i = theta >> 5, k = i & 1023u;')
+    lines.append('\tif (k > 512u) k = 1024u - k;')
+    lines.append('\tshort s = sin_q[k];')
+    lines.append('\treturn (i & 1024u) ? (short)-s : s;')
+    lines.append('}')
+    (src/'sintab.h').write_text('\n'.join(lines) + '\n')
+    w = src/'wavegen.c'
+    t = w.read_text()
+    assert t.count('sin_tab[theta >> 5]') == 3
+    w.write_text(t.replace('sin_tab[theta >> 5]', 'quarter_sin(theta)'))
+    p = src/'tr_languages.c'
+    t = p.read_text()
+    a = t.index('const ALPHABET *AlphabetFromChar')
+    b = t.index('static void Translator_Russian', a)
+    t = t[:a] + 'const ALPHABET *AlphabetFromChar(int c)\n{\n\t(void)c;\n\treturn NULL;\n}\n\n' + t[b:]
+    a = t.index('static const ALPHABET alphabets[]')
+    b = t.index('const ALPHABET *AlphabetFromChar', a)
+    p.write_text(t[:a] + t[b:])
+    pack_b0(src)
+
+
+def pack_run(nums, group):
+    """Absolute sample every `group` steps, then int8 deltas. The values must fit."""
+    bases, deltas = [], []
+    for i in range(0, len(nums), group):
+        chunk = nums[i:i+group]
+        bases.append(chunk[0])
+        prev = chunk[0]
+        for v in chunk[1:]:
+            d = v - prev
+            assert -128 <= d <= 127
+            deltas.append(d)
+            prev = v
+    return bases, deltas
+
+
+def pack_b0(src):
+    """B0 is read at one index. A checkpoint every 16 steps is the same table in half the bytes."""
+    p = src/'klatt.c'
+    t = p.read_text()
+    if 'b0_at(' in t:
+        return
+    m = re.search(r'\tstatic const short B0\[224\] = \{([^}]+)\};', t)
+    nums = [int(x) for x in re.findall(r'-?\d+', m.group(1))]
+    assert len(nums) == 224
+    bases, deltas = pack_run(nums, 16)
+    def rows(vals, per):
+        return '\n'.join('\t\t' + ', '.join(str(n) for n in vals[i:i+per]) + ',' for i in range(0, len(vals), per))
+    fn = (
+        'static short b0_at(int i)\n{\n'
+        '\tstatic const short base[14] = {\n' + rows(bases, 7) + '\n\t};\n'
+        '\tstatic const signed char d[210] = {\n' + rows(deltas, 15) + '\n\t};\n'
+        '\tif (i < 0) i = 0;\n\tif (i > 223) i = 223;\n'
+        '\tint g = i >> 4, s = base[g];\n'
+        '\tfor (int k = 0; k < (i & 15); k++) s += d[g * 15 + k];\n'
+        '\treturn (short)s;\n}\n\n'
+    )
+    t = t.replace(m.group(0), '')
+    t = t.replace('static void pitch_synch_par_reset(klatt_frame_ptr frame)',
+                  fn + 'static void pitch_synch_par_reset(klatt_frame_ptr frame)', 1)
+    t = t.replace('B0[kt_globals.nopen-40]', 'b0_at(kt_globals.nopen - 40)')
+    # the checkpoint must rebuild every entry
+    for i, v in enumerate(nums):
+        g = i >> 4
+        got = bases[g]
+        for k in range(i & 15):
+            got += deltas[g * 15 + k]
+        assert got == v
+    p.write_text(t)
 
 
 if __name__=='__main__':prepare(Path(__file__).resolve().parents[1])

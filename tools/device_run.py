@@ -14,10 +14,12 @@ import mido
 
 BTN = ["FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ", "PLAY", "REC", "OCT-", "OCT+"]
 ENC = ["SELECT", "ALGO", "PRESET", "K1", "K2", "K3", "K4"]
-PAGES = ["Sing", "Song", "Steps", "Sound", "Envelope", "Effects", "Mixer", "Setup", "Change"]
+PAGES = ["Sing", "Song", "Phrase", "Sound", "Envelope", "Karaoke", "Mixer", "Setup", "Arp"]
 TRACKS = ["Voice", "Keys", "Bass", "Drums"]
 TEXT_KEYS = "lambncopdqersftguhvwixjyzk "
 HEAD = [0x7D, 0x4F, 0x4D]
+# song_t's layout (firmware/src/app/song.h, version 8): where the fields peeked at are
+SONG = dict(lane_bars=122, line=126, note=4478, row=7550, lane=7934, pattern=8446)
 
 
 def le7(n, k):
@@ -28,6 +30,13 @@ class Device:
     def __init__(self, port):
         self.i, self.o = mido.open_input(port), mido.open_output(port)
         self.buttons = self.keys = 0
+
+    def close(self):                           # (closed here: left to the garbage collector, a port can close
+        for p in (self.i, self.o):               # itself from inside its own MIDI callback and hang the run)
+            try:
+                p.close()
+            except BaseException:
+                pass
 
     def send(self, *b):
         self.o.send(mido.Message("sysex", data=HEAD + list(b)))
@@ -42,8 +51,9 @@ class Device:
             d -= step
 
     def ask(self, cmd, *body, wait=1.0):
-        while self.i.poll():
-            pass
+        t = time.time()
+        while self.i.poll() and time.time() - t < 0.05:
+            pass                                   # (what came before; bounded: a playing FM-1 never stops sending)
         self.send(cmd, *body)
         t = time.time()
         while time.time() - t < wait:
@@ -58,16 +68,16 @@ class Device:
         if not d:
             return None
         return dict(playing=d[6], page=d[7], track=d[8], slot=-1 if d[9] == 127 else d[9], unsaved=d[10],
-                    bpm=d[11] | d[12] << 7, name=bytes(d[18:42]).split(b"\0")[0].decode(),
-                    build=bytes(d[42:]).split(b"\0")[0].decode())
+                    bpm=d[11] | d[12] << 7, tick=d[16] | d[17] << 7, name=bytes(d[18:42]).split(b"\0")[0].decode(),
+                    build=bytes(d[42:65]).split(b"\0")[0].decode(), poetry=d[65] if len(d) > 65 else 0)
 
     def screen(self):
         d = self.ask(53)
         if not d:
             return None
         f = d[1]
-        return dict(page=d[0], list=f & 3, words=f >> 2 & 1, ask=f >> 3 & 1, moving=f >> 4 & 1, entry=f >> 5 & 1,
-                    srec=f >> 6 & 1, bar=d[72], mutes=d[73], misses=d[74] | d[75] << 7, rows=d[2], row=d[3], notes=d[4] | d[5] << 7, cpu=d[6], level=d[7],
+        return dict(page=d[0], list=f & 3, words=f >> 2 & 1, ask=f >> 3 & 1, moving=f >> 4 & 1,
+                    bar=d[72], mutes=d[73], misses=d[74] | d[75] << 7, draw_ms=(d[76] | d[77] << 7) if len(d) > 77 else -1, gap_ms=(d[78] | d[79] << 7) if len(d) > 79 else -1, rows=d[2], row=d[3], notes=d[4] | d[5] << 7, cpu=d[6], level=d[7],
                     msg=(bytes(d[8:24]).split(b"\0")[0] + b" " + bytes(d[24:40]).split(b"\0")[0]).decode().strip(), line=bytes(d[40:72]).split(b"\0")[0].decode())
 
     def peek(self, at, n):
@@ -93,24 +103,35 @@ class Device:
 def song_pitch(dev, row, note):
     """the pitch of note `note` of the line row `row` sings, read from the device (-1: none)"""
     u16 = lambda b: b[0] | b[1] << 8
-    r = dev.peek(7560 + row * 4, 3)
+    r = dev.peek(SONG["row"] + row * 4, 3)
     if not r:
         return None
     line = r[2]
-    h = dev.peek(136 + line * 68 + 64, 3)
+    h = dev.peek(SONG["line"] + line * 68 + 64, 3)
     first, count = u16(h), h[2]
     if note >= count:
         return -1
-    return dev.peek(4488 + (first + note) * 6 + 3, 1)[0]
+    return dev.peek(SONG["note"] + (first + note) * 6 + 3, 1)[0]
 
 
-def song_step(dev, bar, track, s):
-    """a step of the bar's pattern, as the simulator's `expect step` says it: Drums the drum bits, Keys and
-    Bass the first note (0: a rest)"""
-    pattern = dev.peek(7944 + bar, 1)[0] % 16
-    at = 8072 + pattern * 480 + ((track - 1) * 16 + s) * 10
-    b = dev.peek(at, 10)
+def song_step(dev, bar, track, s, nudge=False):
+    """a step of bar `bar` of the track's chain, as the simulator's `expect step` says it: Drums the drum bits,
+    Keys and Bass the first note (0: a rest); or its nudge"""
+    m = dev.peek(SONG["lane"] + track * 128 + bar, 1)[0] & 31
+    if m >= 16:
+        return 0                                       # a bar of rest
+    b = dev.peek(SONG["pattern"] + m * 480 + ((track - 1) * 16 + s) * 10, 10)
+    if nudge:
+        return b[9] - 256 if b[9] > 127 else b[9]
     return (b[0] | b[1] << 8) if track == 3 else (b[2] if b[6] else 0)
+
+
+def song_phrases(dev, track):
+    """the bars of each phrase of the track's chain"""
+    n = dev.peek(SONG["lane_bars"] + track, 1)[0]
+    lane = dev.peek(SONG["lane"] + track * 128, n)
+    starts = [b for b in range(n) if lane[b] & 0x80] + [n]
+    return [starts[i + 1] - starts[i] for i in range(len(starts) - 1)]
 
 
 def find_port(name):
@@ -156,7 +177,7 @@ def main():
     ap.add_argument("--port")
     ap.add_argument("--wav", type=Path)
     ap.add_argument("--audio", default="386DX FM-1")
-    ap.add_argument("--reset", action="store_true", help="empty S2..S8 and restart first, so the run starts as the simulator does")
+    ap.add_argument("--reset", action="store_true", help="empty S2..S8, restart, open Greensleeves and reset every knob first, so the run starts as the simulator does")
     ap.add_argument("--hold", type=int, help="hold every key and button this many ms (a quick real tap is 30-100)")
     ap.add_argument("-v", "--verbose", action="store_true", help="print each line as it runs")
     ap.add_argument("--speed", type=float, default=1.0, help="stretch every pause (the device is slower than the simulator)")
@@ -174,6 +195,7 @@ def main():
         for _ in range(40):
             time.sleep(0.5)
             try:
+                dev.close()
                 dev = Device(find_port(a.port))
                 if dev.status():
                     break
@@ -189,11 +211,17 @@ def main():
             dev.buttons &= ~(1 << BTN.index(name))
             dev.hold(); time.sleep(0.35)
         if st["name"] != "Greensleeves":
-            press("GLO"); press("SEL"); press("SEL")           # LOAD: the slots
-            dev.turn(ENC.index("SELECT"), -8); time.sleep(0.4)
+            press("SAVE"); press("SEL")                         # SAVE's list, LOAD: the slots, from the song's own
+            dev.turn(ENC.index("SELECT"), -max(st["slot"], 0)); time.sleep(0.4)   # (the list comes round: to S1)
             press("SEL"); time.sleep(1.0)
             press("HOME") if dev.screen()["page"] != 0 else None
             st = dev.status()
+        # every knob as a new song has it (GLO's list, RESET KNOBS, yes), whatever was turned by hand before
+        press("GLO"); press("SEL"); press("SEL"); press("SEL"); time.sleep(0.5)
+        press("HOME")
+        if dev.screen()["page"] != 0:
+            press("HOME")
+        st = dev.status()
     print(f"{st['name']!r} build {st['build']} page {PAGES[st['page']]}")
     rec = start_recording(a.audio, a.wav) if a.wav else None
     time.sleep(1.0)
@@ -269,10 +297,22 @@ def main():
                         run(250)
             elif cmd == "wait":
                 run(int(arg))
+            elif cmd == "waittick":
+                # until the song plays sixteenth N (the status's playhead), as the simulator's waittick
+                want, end = int(arg), time.time() + 120
+                while time.time() < end:
+                    st = dev.status()
+                    if st and st["playing"] and st["tick"] >= want:
+                        break
+                    run(20)
             elif cmd == "expect":
                 s, v = dev.screen(), dev.status()
                 if not s or not v:
                     fail(ln, "the FM-1 stopped answering")
+                    continue
+                if arg == "mode":
+                    if v["poetry"] != (more.strip() == "slamjam"):
+                        fail(ln, f"mode {'slamjam' if v['poetry'] else 'karaoke'}, expected {more.strip()}")
                     continue
                 if arg == "page":
                     if PAGES[s["page"]] != more:
@@ -299,7 +339,8 @@ def main():
                     if v["unsaved"] != int(more):
                         fail(ln, f"unsaved {v['unsaved']}, expected {more}")
                 elif arg == "msg":
-                    if more.upper() not in s["msg"].upper():
+                    got = s["msg"].upper()           # the readback carries 16 characters of the first line
+                    if more.upper() not in got and not (len(got) >= 15 and more.upper().startswith(got)):
                         fail(ln, f"message {s['msg']!r}, expected {more!r}")
                 elif arg == "line_text":
                     r, _, want = more.partition(" ")
@@ -319,6 +360,17 @@ def main():
                     got = song_step(dev, s["bar"], t, (int(st) - 1) & 15) if t >= 1 else None
                     if got != int(want):
                         fail(ln, f"{tn} step {st} is {got}, expected {want}")
+                elif arg in ("phrases", "phrase_len"):
+                    tn, *nums = more.split()
+                    ph = song_phrases(dev, TRACKS.index(tn))
+                    got = len(ph) if arg == "phrases" else (ph[int(nums[0])] if int(nums[0]) < len(ph) else -1)
+                    if got != int(nums[-1]):
+                        fail(ln, f"{tn} {arg} is {got}, expected {nums[-1]}")
+                elif arg == "nudge" and not more.startswith("Voice"):
+                    tn, st, want = more.split()
+                    got = song_step(dev, s["bar"], TRACKS.index(tn), (int(st) - 1) & 15, nudge=True)
+                    if got != int(want):
+                        fail(ln, f"{tn} step {st} nudge {got}, expected {want}")
                 elif arg == "sung":
                     if bool(level_seen) != bool(int(more)):
                         fail(ln, f"sung level {level_seen}, expected {'some' if int(more) else 'none'}")
@@ -365,4 +417,5 @@ def main():
     sys.exit(1 if fails else 0)
 
 
-main()
+if __name__ == "__main__":
+    main()

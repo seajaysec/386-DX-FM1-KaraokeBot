@@ -1,0 +1,11 @@
+foreign
+# a key tapped and let go just before HOME, while the main loop is busy (both latched in one look), is a note,
+# not HOME + key: HOME still goes back to Sing
+pace 350
+tap SAVE
+tap SEL
+turn SELECT 1
+tap SEL
+key 7
+tap HOME
+expect page Sing

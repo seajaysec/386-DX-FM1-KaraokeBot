@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 import {planMidi} from './karaoke.mjs';
-import {usage, LINES, ROWS, NOTES} from './song7.mjs';
+import {usage, LINES, ROWS, NOTES} from './song8.mjs';
 
 // Convert MIDI clocks in the importer, never ask the player to edit another file.
 export function prepareTiming(input,options={}){
