@@ -9,7 +9,7 @@ text-to-speech singing voices played along to MIDI covers of pop songs.
 In so many ways, Alexei was—and still is—ahead of his time, and he’s been an inspiration to many
 who’ve discovered his music in the decades since 386 DX performed.
 
-[![The 386DX trailer](https://i.ytimg.com/vi/6pK_k7b8pGM/hqdefault.jpg)](https://youtu.be/6pK_k7b8pGM)
+[![The 386DX trailer](https://img.youtube.com/vi/6pK_k7b8pGM/maxresdefault.jpg)](https://youtu.be/6pK_k7b8pGM)
 
 386DX turns the M-VAVE FM-1 into a karaoke robot with a band. It sings songs you bring in from
 karaoke and MIDI files, and lines you type on the FM-1 itself, to notes you play on its keys. Its
