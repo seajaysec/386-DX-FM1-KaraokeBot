@@ -57,3 +57,5 @@ code comes from.
 The singing voice is its own project, [386 DX Engine](https://github.com/seajaysec/386-DX-ENGINE): built
 for this firmware, usable without it. This firmware is where the engine shows what it can do, and the web
 page runs the same engine in your browser.
+
+You can also try 386DX in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
